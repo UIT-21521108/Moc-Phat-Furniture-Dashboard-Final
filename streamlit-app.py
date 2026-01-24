@@ -1,8 +1,8 @@
 
 # app.py
 # Báo cáo kinh doanh Mộc Phát Furniture (2023–2025)
-# Phân tích dùng toàn bộ dữ liệu (bao gồm ECOM), bộ lọc đẹp, animation + hover giải thích chi tiết
-# Tác giả: M365 Copilot cho Nguyễn Minh Lý
+# Phân tích toàn bộ dữ liệu (kể cả ECOM), bộ lọc mượt, animation, hover giải thích chi tiết
+# ĐÃ THÊM: Tab Insight (Mùa–Màu–Vùng, SKU Health, cảnh báo), Tab Khu vực (100% theo năm + 3 chế độ phụ)
 
 import os
 import streamlit as st
@@ -13,20 +13,12 @@ import plotly.graph_objects as go
 from io import BytesIO
 from datetime import datetime
 
-# Ag-Grid (bảng dữ liệu tương tác)
-try:
-    from st_aggrid import AgGrid, GridOptionsBuilder, ColumnsAutoSizeMode
-    AGGRID_AVAILABLE = True
-except Exception:
-    AGGRID_AVAILABLE = False
-
-# =============== THIẾT LẬP GIAO DIỆN ===============
+# ========= THIẾT LẬP GIAO DIỆN =========
 st.set_page_config(page_title="Báo cáo kinh doanh Mộc Phát Furniture", layout="wide")
 
 PRIMARY = "#00B8A9"
 ACCENT  = "#F6416C"
 
-# Màu cột đúng màu thực
 COLOR_PALETTE = {
     "BROWN":   "#8B5A2B",
     "WHITE":   "#F2F2F2",
@@ -43,6 +35,7 @@ COLOR_PALETTE = {
 
 CUSTOM_CSS = """
 <style>
+html { scroll-behavior: smooth; }
 h1, h2, h3, h4 { font-weight: 700 !important; }
 .kpi-card {
   padding: 12px 16px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.08);
@@ -58,10 +51,9 @@ st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
 PLOT_TEMPLATE = 'plotly_dark' if st.get_option('theme.base') == 'dark' else 'plotly_white'
 
-# =============== HÀM HỖ TRỢ ===============
+# ========= HÀM HỖ TRỢ =========
 @st.cache_data(show_spinner=False)
 def load_data(file_or_buffer):
-    """Đọc Excel/CSV, chuẩn hoá tên cột & kiểu dữ liệu."""
     if file_or_buffer is None:
         return None
     name = getattr(file_or_buffer, 'name', '') if file_or_buffer else ''
@@ -76,7 +68,6 @@ def load_data(file_or_buffer):
     return df
 
 def bucket_color(v: str) -> str:
-    """Gộp tên màu chi tiết vào nhóm màu chính để dễ xem."""
     v = str(v).upper()
     if ('BROWN' in v) or ('COCOA' in v) or ('BRONZE' in v) or ('UMBER' in v): return 'BROWN'
     if any(x in v for x in ['WHITE','OFF WHITE','WHT','IVORY','CREAM','GLOSS']): return 'WHITE'
@@ -91,7 +82,7 @@ def bucket_color(v: str) -> str:
     return 'OTHER'
 
 def prep_data(df: pd.DataFrame) -> pd.DataFrame:
-    """Làm sạch, tạo cờ, nhóm màu. (KHÔNG loại ECOM: phân tích toàn bộ dữ liệu)"""
+    """Giữ toàn bộ dữ liệu (kể cả ECOM), tạo cờ/nhóm để phân tích."""
     df = df.copy()
     for c in ['khach_hang','ma_hang','mo_ta','mau_son','sl','sl_container','month','year','is_usb']:
         if c not in df.columns: df[c] = np.nan
@@ -104,17 +95,17 @@ def prep_data(df: pd.DataFrame) -> pd.DataFrame:
     df['usb_flag'] = df.get('is_usb', '').astype(str).str.contains('USB', case=False) | \
                      df['ma_hang'].fillna('').astype(str).str.contains('USB', case=False)
 
-    # Khu vực (xuất khẩu)
+    # Khu vực: heuristic gắn với tập khách NA/EU/Other
     kh = df['khach_hang'].fillna('')
     conds = [
         kh.str.contains('TJX EUROPE|TK', case=False),
-        kh.str.contains('TJMAXX|MARSHALL|HOMEGOODS|HOMESENSE|WINNERS|MMX|TJX UK', case=False)
+        kh.str.contains('TJMAXX|MARSHALL|HOMEGOODS|HOMESENSE|WINNERS|MMX|TJX UK|ECOM', case=False)
     ]
     df['khu_vuc'] = np.select(conds, ['Châu Âu','Bắc Mỹ'], default='Khác')
 
-    # Tay nắm/phụ kiện (từ mô tả)
+    # Tay nắm/phụ kiện
     df['pk_dong_co'] = text.str.contains('ANTIQUE BRASS')
-    df['pk_bronze']  = text.str.contains('ANTIQUE BRONZE')
+    df['pk_bronze']  = text.str_contains('ANTIQUE BRONZE')
     df['pk_niken']   = text.str.contains('NICKEL')
     df['pk_go']      = text.str.contains('WOOD HARDWARE')
 
@@ -123,7 +114,6 @@ def prep_data(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 def add_play_controls(fig, frame_ms=700, transition_ms=300):
-    """Thêm play/pause & tốc độ cho figure có animation frames."""
     fig.update_layout(
         updatemenus=[dict(
             type="buttons", showactive=False, y=1.15, x=1.0, xanchor="right",
@@ -141,21 +131,15 @@ def add_play_controls(fig, frame_ms=700, transition_ms=300):
     return fig
 
 def apply_filters(base: pd.DataFrame):
-    """Bộ lọc Sidebar – mặc định chọn TẤT CẢ (đảm bảo đúng tổng)."""
     with st.sidebar:
         st.header("Bộ lọc")
 
-        # Tuỳ chọn chung
         with st.expander("Thời gian & tuỳ chọn chung", expanded=True):
             years = sorted(base['year'].unique())
-            year_sel = st.multiselect("Năm", options=years, default=years, key="flt_years",
-                                      help="Chọn các năm muốn xem")
-            show_explain = st.toggle("🛈 Hiển thị giải thích trên biểu đồ", value=True,
-                                     help="Bật để xem mô tả ý nghĩa & % tỷ trọng khi di chuột.")
-            animate_on   = st.toggle("🎞️ Bật hiệu ứng động (animation)", value=True,
-                                     help="Bật để xem bar‑race/timelapse theo thời gian.")
+            year_sel = st.multiselect("Năm", options=years, default=years, key="flt_years")
+            show_explain = st.toggle("🛈 Hiển thị giải thích trên biểu đồ", value=True)
+            animate_on   = st.toggle("🎞️ Bật hiệu ứng động (animation)", value=True)
 
-        # Khách hàng
         with st.expander("Khách hàng", expanded=False):
             cust_all = sorted(base['khach_hang'].dropna().unique().tolist())
             default_cust = st.session_state.get("flt_cust_default", cust_all)
@@ -172,14 +156,12 @@ def apply_filters(base: pd.DataFrame):
                     st.session_state["flt_cust_default"] = []
                     st.rerun()
 
-        # Khu vực & Màu
         with st.expander("Khu vực & Nhóm màu", expanded=False):
             reg_sel   = st.multiselect("Khu vực", options=sorted(base['khu_vuc'].unique()),
                                        default=list(base['khu_vuc'].unique()), key="flt_regions")
             color_sel = st.multiselect("Nhóm màu", options=sorted(base['nhom_mau'].unique()),
                                        default=list(base['nhom_mau'].unique()), key="flt_colors")
 
-        # Tìm kiếm & tuỳ chọn
         with st.expander("Tìm kiếm sản phẩm & tuỳ chọn khác", expanded=False):
             sku_query = st.text_input("Tìm theo mã sản phẩm (ví dụ: MP, MT001, BRN)", key="flt_sku")
             usb_only  = st.checkbox("Chỉ sản phẩm có cổng sạc (USB)", value=False, key="flt_usb")
@@ -199,7 +181,6 @@ def apply_filters(base: pd.DataFrame):
     return f, show_explain, animate_on
 
 def excel_download(df: pd.DataFrame) -> bytes:
-    """Xuất Excel dữ liệu đã lọc + tóm tắt theo Năm/Màu/Khách/SKU."""
     output = BytesIO()
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
         df.to_excel(writer, index=False, sheet_name='DATA')
@@ -210,13 +191,11 @@ def excel_download(df: pd.DataFrame) -> bytes:
     return output.getvalue()
 
 def add_kpi_cards(df: pd.DataFrame):
-    """Thẻ KPI ngắn gọn, dễ hiểu (thuần Việt)."""
     by_year = df.groupby('year')['sl'].sum().sort_index()
     t23, t24, t25 = [by_year.get(y, 0) for y in [2023, 2024, 2025]]
     yoy24 = (t24 - t23)/t23*100 if t23 else np.nan
     yoy25 = (t25 - t24)/t24*100 if t24 else np.nan
 
-    # Lũy kế đến tháng gần nhất vs cùng kỳ
     last_ym = df['ym'].max() if not df.empty else None
     ytd, pytd, ytd_g = 0, 0, np.nan
     if last_ym is not None:
@@ -244,7 +223,6 @@ def add_kpi_cards(df: pd.DataFrame):
         st.markdown('</div>', unsafe_allow_html=True)
 
 def anomaly_and_forecast(tr: pd.DataFrame, title_suffix: str=""):
-    """Điểm bất thường (±2σ) + dự đoán 3 tháng (đơn giản)."""
     if tr.empty:
         return None, None
     s = tr.set_index('ym')['sl'].sort_index()
@@ -260,7 +238,6 @@ def anomaly_and_forecast(tr: pd.DataFrame, title_suffix: str=""):
     fig1.update_layout(template=PLOT_TEMPLATE, title=f"Điểm bất thường (±2σ){' – ' + title_suffix if title_suffix else ''}",
                        xaxis_title="Thời gian (tháng)", yaxis_title="Sản lượng")
 
-    # Dự đoán đơn giản: EWMA(span=3) + trung bình 3 tháng gần nhất
     span = 3
     ewma = s.ewm(span=span, adjust=False).mean()
     last3 = s.tail(3).mean() if len(s) >= 3 else s.mean()
@@ -278,7 +255,6 @@ def anomaly_and_forecast(tr: pd.DataFrame, title_suffix: str=""):
     return fig1, fig2
 
 def pareto_share(df: pd.DataFrame, by_col: str='khach_hang'):
-    """Bảng tích luỹ 80/20 theo khách hàng hoặc SKU."""
     if df.empty:
         return pd.DataFrame()
     s = df.groupby(by_col)['sl'].sum().sort_values(ascending=False).reset_index()
@@ -287,11 +263,10 @@ def pareto_share(df: pd.DataFrame, by_col: str='khach_hang'):
     s['cum_share'] = s['cum_units']/total if total else 0
     return s
 
-# =============== NGUỒN DỮ LIỆU (UPLOAD hoặc file mặc định) ===============
+# ========= NGUỒN DỮ LIỆU =========
 st.title("📊 Báo cáo kinh doanh Mộc Phát Furniture")
 st.caption("Tải file Excel/CSV của bạn hoặc dùng sẵn tệp mặc định nếu có trong thư mục.")
 
-# Giải thích nhanh
 with st.expander("Giải thích nhanh các khái niệm (1 phút)"):
     st.markdown("""
 - **Sản lượng**: số đơn vị giao hàng.  
@@ -318,13 +293,13 @@ if raw is None or raw.empty:
 base = prep_data(raw)
 f, show_explain, animate_on = apply_filters(base)
 
-# Thẻ KPI
+# KPI
 add_kpi_cards(f)
 
-# =============== CÁC TAB (không Container, 100% tiếng Việt) ===============
-T1, T2, T3, T4, T5, T6 = st.tabs([
+# ========= TABS =========
+T1, T2, T3, T4, T5, T6, T7 = st.tabs([
     "Tổng quan", "Khách hàng", "Sản phẩm (SKU)", "Màu & Tay nắm",
-    "Khu vực", "Biến động & Dự đoán"
+    "Khu vực", "Biến động & Dự đoán", "Insight (Gợi ý vận hành)"
 ])
 
 # --- TAB 1: Tổng quan ---
@@ -337,7 +312,6 @@ with T1:
         fig.update_layout(xaxis_title="Thời gian (tháng)", yaxis_title="Sản lượng")
         if show_explain:
             fig.update_traces(hovertemplate="Tháng: %{x|%Y-%m}<br>Sản lượng: %{y:,}<extra></extra>")
-            st.caption("Biểu đồ đường cho thấy sản lượng theo từng tháng để nhận biết mùa vụ, đỉnh/đáy.")
         st.plotly_chart(fig, use_container_width=True, key="t1_trend")
 
     c1, c2 = st.columns(2)
@@ -345,45 +319,35 @@ with T1:
         st.markdown("**Tỷ trọng màu theo năm (100%)**")
         color_tot = f.groupby(['year','nhom_mau'])['sl'].sum().reset_index()
         if not color_tot.empty:
-            # Tính tỷ trọng theo năm
-            color_tot['share'] = color_tot['sl'] / color_tot.groupby('year')['sl'].transform('sum')
+            color_tot['share'] = color_tot['sl']/color_tot.groupby('year')['sl'].transform('sum')
             pvt = (color_tot[['year','nhom_mau','share']]
                    .pivot(index='nhom_mau', columns='year', values='share').fillna(0)
                    .reset_index().melt(id_vars='nhom_mau', var_name='Năm', value_name='Tỷ trọng'))
             order = ["BROWN","WHITE","BLACK","GREY","NATURAL","GREEN","BLUE","PINK","YELLOW","RED","OTHER"]
             pvt['nhom_mau'] = pd.Categorical(pvt['nhom_mau'], categories=order, ordered=True)
             pvt = pvt.sort_values(['Năm','nhom_mau'])
-            fig = px.bar(
-                pvt, x='Năm', y='Tỷ trọng', color='nhom_mau', barmode='stack',
-                template=PLOT_TEMPLATE, color_discrete_map=COLOR_PALETTE
-            )
+            fig = px.bar(pvt, x='Năm', y='Tỷ trọng', color='nhom_mau',
+                         barmode='stack', template=PLOT_TEMPLATE, color_discrete_map=COLOR_PALETTE)
             fig.update_yaxes(tickformat=',.0%')
-            fig.update_layout(legend_title_text="Màu")
             if show_explain:
                 fig.update_traces(hovertemplate="Năm: %{x}<br>Màu: %{legendgroup}<br>Tỷ trọng: %{y:.1%}<extra></extra>")
-                st.caption("100% stack: mỗi cột là tổng 100% của năm đó; phần màu thể hiện tỷ trọng nhóm màu.")
             st.plotly_chart(fig, use_container_width=True, key="t1_colormix")
 
     with c2:
-        st.markdown("**Đặc tính sản phẩm (tỷ lệ cổng sạc USB theo năm)**")
+        st.markdown("**Tỷ lệ sản phẩm có cổng sạc (USB) theo năm**")
         yuniq = sorted(f['year'].unique())
-        shares = pd.DataFrame({
-            'Năm': yuniq,
-            'Tỷ lệ USB': [f[f['year']==y]['usb_flag'].mean() for y in yuniq]
-        })
-        m = shares.melt(id_vars='Năm', var_name='Chỉ tiêu', value_name='Tỷ lệ')
-        fig = px.bar(m, x='Năm', y='Tỷ lệ', color='Chỉ tiêu', barmode='group', template=PLOT_TEMPLATE)
+        shares = pd.DataFrame({'Năm': yuniq,'Tỷ lệ USB': [f[f['year']==y]['usb_flag'].mean() for y in yuniq]})
+        m_usb = shares.melt(id_vars='Năm', var_name='Chỉ tiêu', value_name='Tỷ lệ')
+        fig = px.bar(m_usb, x='Năm', y='Tỷ lệ', color='Chỉ tiêu', barmode='group', template=PLOT_TEMPLATE)
         fig.update_yaxes(tickformat=',.0%')
         if show_explain:
             fig.update_traces(hovertemplate="Năm: %{x}<br>% USB: %{y:.1%}<extra></extra>")
-            st.caption("Tỷ lệ sản phẩm có cổng sạc (USB) theo năm.")
         st.plotly_chart(fig, use_container_width=True, key="t1_usbshare")
 
 # --- TAB 2: Khách hàng ---
 with T2:
     st.subheader("Khách hàng")
-
-    # === Bar-race theo THÁNG (Top 10) ===
+    # Bar-race theo tháng (Top 10)
     if animate_on:
         topn = 10
         by_m = f.groupby(['ym','khach_hang'])['sl'].sum().reset_index()
@@ -395,13 +359,12 @@ with T2:
             by_m['rank'] = by_m.groupby('ym')['sl'].rank(method='first', ascending=False).astype(int)
             by_m = by_m.groupby('ym').head(topn)
             by_m['label'] = np.where(by_m['rank']==1, " (khách hàng lớn nhất tháng)", "")
-            fig = px.bar(
-                by_m, x='sl', y='khach_hang', orientation='h',
-                animation_frame='ym_str', color='khach_hang',
-                template=PLOT_TEMPLATE, title="Bar‑race: Top khách hàng theo từng tháng",
-            )
+            fig = px.bar(by_m, x='sl', y='khach_hang', orientation='h',
+                         animation_frame='ym_str', color='khach_hang',
+                         template=PLOT_TEMPLATE, title="Bar‑race: Top khách hàng theo từng tháng")
             fig.update_traces(
-                hovertemplate="Tháng: %{animation_frame}<br>KH: %{y}%{customdata[2]}<br>Sản lượng: %{x:,}<br>Tỷ trọng tháng: %{customdata[0]:.1%}<br>Thứ hạng: %{customdata[1]}<extra></extra>",
+                hovertemplate="Tháng: %{animation_frame}<br>KH: %{y}%{customdata[2]}<br>Sản lượng: %{x:,}"
+                              "<br>Tỷ trọng tháng: %{customdata[0]:.1%}<br>Thứ hạng: %{customdata[1]}<extra></extra>",
                 customdata=np.stack([by_m['share'], by_m['rank'], by_m['label']], axis=-1)
             )
             fig.update_layout(xaxis_title="Sản lượng", yaxis_title="Khách hàng")
@@ -410,7 +373,7 @@ with T2:
                 st.caption("Bar‑race cho thấy khách nào dẫn đầu từng tháng; di chuột để xem sản lượng, tỷ trọng và thứ hạng.")
             st.plotly_chart(fig, use_container_width=True, key="t2_bar_race_month")
 
-    # === Top khách hàng theo NĂM (cột) ===
+    # Top KH theo năm
     cust_year = f.groupby(['year','khach_hang'])['sl'].sum().reset_index()
     if not cust_year.empty:
         cust_year['year_total'] = cust_year.groupby('year')['sl'].transform('sum')
@@ -423,38 +386,29 @@ with T2:
             t['label'] = np.where(t['rank']==1, " (khách hàng lớn nhất năm)", "")
             fig = px.bar(t, x='khach_hang', y='sl', title=f'Top 15 khách hàng {y}', template=PLOT_TEMPLATE)
             fig.update_layout(xaxis={'categoryorder':'total descending'}, xaxis_title="Khách hàng", yaxis_title="Sản lượng")
-            # ⚠️ Không dùng f-string cho %{x}/%{y} để tránh NameError
             fig.update_traces(
-                hovertemplate=(
-                    "Năm: " + str(y) +
-                    "<br>KH: %{x}%{customdata[1]}"
-                    "<br>Sản lượng: %{y:,}"
-                    "<br>Tỷ trọng năm: %{customdata[0]:.1%}"
-                    "<br>Thứ hạng: %{customdata[2]}<extra></extra>"
-                ),
+                hovertemplate=("Năm: " + str(y) + "<br>KH: %{x}%{customdata[1]}"
+                               "<br>Sản lượng: %{y:,}<br>Tỷ trọng năm: %{customdata[0]:.1%}"
+                               "<br>Thứ hạng: %{customdata[2]}<extra></extra>"),
                 customdata=np.stack([t['share'], t['label'], t['rank']], axis=-1)
             )
-            if show_explain:
-                cols[i % 2].caption("Di chuột để xem % tỷ trọng năm và nhãn “khách hàng lớn nhất năm”.")
             cols[i % 2].plotly_chart(fig, use_container_width=True, key=f"t2_topcust_{y}")
 
     st.markdown("---")
     st.subheader("Quy tắc 80/20 theo khách hàng")
     pareto = pareto_share(f, 'khach_hang')
     if not pareto.empty:
-        fig = px.line(pareto, x=pareto.index+1, y='cum_share', markers=True, title='Tích luỹ tỷ trọng (khách hàng)', template=PLOT_TEMPLATE)
+        fig = px.line(pareto, x=pareto.index+1, y='cum_share', markers=True,
+                      title='Tích luỹ tỷ trọng (khách hàng)', template=PLOT_TEMPLATE)
         fig.add_hline(y=0.8, line_dash='dash', line_color=ACCENT)
         fig.update_yaxes(tickformat=',.0%'); fig.update_xaxes(title="Số khách hàng theo thứ hạng")
-        if show_explain:
-            fig.update_traces(hovertemplate="Xếp hạng KH: %{x}<br>Tích luỹ tỷ trọng: %{y:.1%}<extra></extra>")
-            st.caption("Đường tích luỹ cho thấy mức tập trung: cần bao nhiêu KH để đạt 80% sản lượng.")
+        fig.update_traces(hovertemplate="Xếp hạng KH: %{x}<br>Tích luỹ tỷ trọng: %{y:.1%}<extra></extra>")
         st.plotly_chart(fig, use_container_width=True, key="t2_pareto_cust")
 
 # --- TAB 3: Sản phẩm (SKU) ---
 with T3:
     st.subheader("Sản phẩm (SKU)")
-
-    # === Bar-race theo THÁNG (Top 15 SKU) ===
+    # Bar-race SKU theo tháng
     if animate_on:
         topn = 15
         by_m_sku = f.groupby(['ym','ma_hang'])['sl'].sum().reset_index()
@@ -466,13 +420,12 @@ with T3:
             by_m_sku['rank'] = by_m_sku.groupby('ym')['sl'].rank(method='first', ascending=False).astype(int)
             by_m_sku = by_m_sku.groupby('ym').head(topn)
             by_m_sku['label'] = np.where(by_m_sku['rank']==1, " (SKU dẫn đầu tháng)", "")
-            fig = px.bar(
-                by_m_sku, x='sl', y='ma_hang', orientation='h',
-                animation_frame='ym_str', color='ma_hang',
-                template=PLOT_TEMPLATE, title="Bar‑race: Top SKU theo từng tháng"
-            )
+            fig = px.bar(by_m_sku, x='sl', y='ma_hang', orientation='h',
+                         animation_frame='ym_str', color='ma_hang',
+                         template=PLOT_TEMPLATE, title="Bar‑race: Top SKU theo từng tháng")
             fig.update_traces(
-                hovertemplate="Tháng: %{animation_frame}<br>SKU: %{y}%{customdata[2]}<br>Sản lượng: %{x:,}<br>Tỷ trọng tháng: %{customdata[0]:.1%}<br>Thứ hạng: %{customdata[1]}<extra></extra>",
+                hovertemplate="Tháng: %{animation_frame}<br>SKU: %{y}%{customdata[2]}<br>Sản lượng: %{x:,}"
+                              "<br>Tỷ trọng tháng: %{customdata[0]:.1%}<br>Thứ hạng: %{customdata[1]}<extra></extra>",
                 customdata=np.stack([by_m_sku['share'], by_m_sku['rank'], by_m_sku['label']], axis=-1)
             )
             fig.update_layout(xaxis_title="Sản lượng", yaxis_title="SKU")
@@ -481,7 +434,7 @@ with T3:
                 st.caption("Bar‑race giúp xem SKU nào nổi bật theo từng tháng (sản lượng, % và thứ hạng).")
             st.plotly_chart(fig, use_container_width=True, key="t3_bar_race_month")
 
-    # === Top SKU theo NĂM (cột) ===
+    # Top SKU theo năm
     sku_year = f.groupby(['year','ma_hang'])['sl'].sum().reset_index()
     if not sku_year.empty:
         sku_year['year_total'] = sku_year.groupby('year')['sl'].transform('sum')
@@ -494,63 +447,37 @@ with T3:
             s['label'] = np.where(s['rank']==1, " (SKU dẫn đầu năm)", "")
             fig = px.bar(s, x='ma_hang', y='sl', title=f'Top 20 SKU {y}', template=PLOT_TEMPLATE)
             fig.update_layout(xaxis={'categoryorder':'total descending'}, xaxis_title="SKU", yaxis_title="Sản lượng")
-            # ⚠️ Không dùng f-string cho %{x}/%{y} để tránh NameError
             fig.update_traces(
-                hovertemplate=(
-                    "Năm: " + str(y) +
-                    "<br>SKU: %{x}%{customdata[1]}"
-                    "<br>Sản lượng: %{y:,}"
-                    "<br>Tỷ trọng năm: %{customdata[0]:.1%}"
-                    "<br>Thứ hạng: %{customdata[2]}<extra></extra>"
-                ),
+                hovertemplate=("Năm: " + str(y) + "<br>SKU: %{x}%{customdata[1]}"
+                               "<br>Sản lượng: %{y:,}<br>Tỷ trọng năm: %{customdata[0]:.1%}"
+                               "<br>Thứ hạng: %{customdata[2]}<extra></extra>"),
                 customdata=np.stack([s['share'], s['label'], s['rank']], axis=-1)
             )
-            if show_explain:
-                cols[i % 2].caption("Di chuột để xem % tỷ trọng năm và nhãn “SKU dẫn đầu năm”.")
             cols[i % 2].plotly_chart(fig, use_container_width=True, key=f"t3_topsku_{y}")
 
     st.markdown("---")
     st.subheader("Quy tắc 80/20 theo SKU")
     psku = pareto_share(f, 'ma_hang')
     if not psku.empty:
-        fig = px.line(psku, x=psku.index+1, y='cum_share', markers=True, title='Tích luỹ tỷ trọng (SKU)', template=PLOT_TEMPLATE)
+        fig = px.line(psku, x=psku.index+1, y='cum_share', markers=True,
+                      title='Tích luỹ tỷ trọng (SKU)', template=PLOT_TEMPLATE)
         fig.add_hline(y=0.8, line_dash='dash', line_color=ACCENT)
         fig.update_yaxes(tickformat=',.0%'); fig.update_xaxes(title="Số SKU theo thứ hạng")
-        if show_explain:
-            fig.update_traces(hovertemplate="Xếp hạng SKU: %{x}<br>Tích luỹ tỷ trọng: %{y:.1%}<extra></extra>")
+        fig.update_traces(hovertemplate="Xếp hạng SKU: %{x}<br>Tích luỹ tỷ trọng: %{y:.1%}<extra></extra>")
         st.plotly_chart(fig, use_container_width=True, key="t3_pareto_sku")
 
 # --- TAB 4: Màu & Tay nắm ---
 with T4:
     st.subheader("Tỷ trọng màu theo năm (100%)")
-    color_tot = f.groupby(['year','nhom_mau'])['sl'].sum().reset_index()
-    if not color_tot.empty:
-        color_tot['share'] = color_tot['sl']/color_tot.groupby('year')['sl'].transform('sum')
-        color_tot = color_tot.sort_values(['year','share'], ascending=[True, False])
-        fig = px.bar(
-            color_tot, x='year', y='share', color='nhom_mau', barmode='stack',
-            template=PLOT_TEMPLATE, color_discrete_map=COLOR_PALETTE
-        )
+    col_tot = f.groupby(['year','nhom_mau'])['sl'].sum().reset_index()
+    if not col_tot.empty:
+        col_tot['share'] = col_tot['sl']/col_tot.groupby('year')['sl'].transform('sum')
+        col_tot = col_tot.sort_values(['year','share'], ascending=[True, False])
+        fig = px.bar(col_tot, x='year', y='share', color='nhom_mau', barmode='stack',
+                     template=PLOT_TEMPLATE, color_discrete_map=COLOR_PALETTE)
         fig.update_yaxes(tickformat=',.0%'); fig.update_layout(legend_title_text="Màu", xaxis_title="Năm", yaxis_title="Tỷ trọng")
-        if show_explain:
-            fig.update_traces(hovertemplate="Năm: %{x}<br>Màu: %{legendgroup}<br>Tỷ trọng: %{y:.1%}<extra></extra>")
+        fig.update_traces(hovertemplate="Năm: %{x}<br>Màu: %{legendgroup}<br>Tỷ trọng: %{y:.1%}<extra></extra>")
         st.plotly_chart(fig, use_container_width=True, key="t4_colormix")
-
-    # Timelapse theo NĂM (sản lượng theo nhóm màu)
-    if animate_on and not color_tot.empty:
-        pvt_anim = color_tot.copy()
-        pvt_anim['Năm'] = pvt_anim['year'].astype(str)
-        fig = px.bar(
-            pvt_anim, x='nhom_mau', y='sl', color='nhom_mau',
-            animation_frame='Năm', template=PLOT_TEMPLATE,
-            color_discrete_map=COLOR_PALETTE,
-            title="Timelapse: Sản lượng theo nhóm màu (mỗi frame = 1 năm)"
-        )
-        fig.update_layout(xaxis_title="Nhóm màu", yaxis_title="Sản lượng")
-        fig = add_play_controls(fig, frame_ms=900, transition_ms=300)
-        if show_explain:
-            fig.update_traces(hovertemplate="Năm: %{animation_frame}<br>Màu: %{x}<br>Sản lượng: %{y:,}<extra></extra>")
-        st.plotly_chart(fig, use_container_width=True, key="t4_color_timelapse")
 
     st.markdown("---")
     st.subheader("Xu hướng sản lượng theo tháng – theo màu")
@@ -559,8 +486,7 @@ with T4:
         fig = px.line(trc, x='ym', y='sl', color='nhom_mau', template=PLOT_TEMPLATE,
                       color_discrete_map=COLOR_PALETTE)
         fig.update_layout(legend_title_text="Màu", xaxis_title="Thời gian (tháng)", yaxis_title="Sản lượng")
-        if show_explain:
-            fig.update_traces(hovertemplate="Tháng: %{x|%Y-%m}<br>Màu: %{legendgroup}<br>Sản lượng: %{y:,}<extra></extra>")
+        fig.update_traces(hovertemplate="Tháng: %{x|%Y-%m}<br>Màu: %{legendgroup}<br>Sản lượng: %{y:,}<extra></extra>")
         st.plotly_chart(fig, use_container_width=True, key="t4_color_trend")
 
     st.markdown("---")
@@ -570,53 +496,71 @@ with T4:
     pk = f[pk_any].groupby('year')[pk_any_cols].mean().reset_index()
     if not pk.empty:
         m = pk.melt(id_vars='year', var_name='Phụ kiện', value_name='Tỷ lệ')
-        m['Phụ kiện'] = m['Phụ kiện'].map({
-            'pk_dong_co': 'Đồng cổ',
-            'pk_bronze': 'Bronze',
-            'pk_niken': 'Niken',
-            'pk_go': 'Gỗ'
-        })
+        m['Phụ kiện'] = m['Phụ kiện'].map({'pk_dong_co': 'Đồng cổ','pk_bronze': 'Bronze','pk_niken': 'Niken','pk_go': 'Gỗ'})
         fig = px.bar(m, x='year', y='Tỷ lệ', color='Phụ kiện', barmode='group', template=PLOT_TEMPLATE)
         fig.update_yaxes(tickformat=',.0%'); fig.update_layout(xaxis_title="Năm")
-        if show_explain:
-            fig.update_traces(hovertemplate="Năm: %{x}<br>Phụ kiện: %{legendgroup}<br>Tỷ lệ xuất hiện: %{y:.1%}<extra></extra>")
+        fig.update_traces(hovertemplate="Năm: %{x}<br>Phụ kiện: %{legendgroup}<br>Tỷ lệ xuất hiện: %{y:.1%}<extra></extra>")
         st.plotly_chart(fig, use_container_width=True, key="t4_hardware")
 
-# --- TAB 5: Khu vực ---
+# --- TAB 5: Khu vực (đổi mới: mặc định Cột 100% theo năm) ---
 with T5:
-    st.subheader("Tỷ trọng theo khu vực (năm)")
+    st.subheader("Khu vực")
+    view = st.radio("Chọn cách hiển thị",
+                    ["Cột 100% theo năm", "Small multiples theo khu vực", "Cột theo quý", "Slope chart 2023→2025"],
+                    index=0, horizontal=True, key="t5_view")
+
     reg = f.groupby(['year','khu_vuc'])['sl'].sum().reset_index()
-    if not reg.empty:
-        reg['year_total'] = reg.groupby('year')['sl'].transform('sum')
-        reg['share'] = reg['sl']/reg['year_total']
-        fig = px.bar(reg, x='year', y='share', color='khu_vuc', barmode='group', template=PLOT_TEMPLATE)
-        fig.update_yaxes(tickformat=',.0%'); fig.update_layout(legend_title_text="Khu vực", xaxis_title="Năm", yaxis_title="Tỷ trọng")
-        if show_explain:
+    if reg.empty:
+        st.info("Không có dữ liệu để hiển thị khu vực.")
+    else:
+        if view == "Cột 100% theo năm":
+            reg['share'] = reg['sl']/reg.groupby('year')['sl'].transform('sum')
+            fig = px.bar(reg, x='year', y='share', color='khu_vuc', barmode='stack',
+                         template=PLOT_TEMPLATE, color_discrete_map=COLOR_PALETTE)
+            fig.update_yaxes(tickformat=',.0%', title="Tỷ trọng")
+            fig.update_xaxes(title="Năm")
+            fig.update_layout(legend_title_text="Khu vực")
             fig.update_traces(hovertemplate="Năm: %{x}<br>Khu vực: %{legendgroup}<br>Tỷ trọng: %{y:.1%}<extra></extra>")
-        st.plotly_chart(fig, use_container_width=True, key="t5_region_mix")
+            if show_explain:
+                st.caption("Mỗi cột = 100% sản lượng của năm đó; phần màu là tỷ trọng từng khu vực. Bắc Mỹ chiếm đa số và tăng mạnh trong 2025.")
+            st.plotly_chart(fig, use_container_width=True, key="t5_bar_100")
 
-    # Timelapse theo NĂM (sản lượng theo khu vực)
-    if animate_on and not reg.empty:
-        tmp = reg.copy()
-        tmp['Năm'] = tmp['year'].astype(str)
-        fig = px.bar(
-            tmp, x='khu_vuc', y='sl', color='khu_vuc',
-            animation_frame='Năm', template=PLOT_TEMPLATE,
-            title="Timelapse: Sản lượng theo khu vực (mỗi frame = 1 năm)"
-        )
-        fig.update_layout(xaxis_title="Khu vực", yaxis_title="Sản lượng", legend_title_text="Khu vực")
-        fig = add_play_controls(fig, frame_ms=900, transition_ms=300)
-        if show_explain:
-            fig.update_traces(hovertemplate="Năm: %{animation_frame}<br>Khu vực: %{x}<br>Sản lượng: %{y:,}<extra></extra>")
-        st.plotly_chart(fig, use_container_width=True, key="t5_region_timelapse")
+        elif view == "Small multiples theo khu vực":
+            m_reg = f.groupby(['ym','khu_vuc'])['sl'].sum().reset_index()
+            if m_reg.empty:
+                st.info("Không có dữ liệu theo tháng để hiển thị.")
+            else:
+                fig = px.line(m_reg, x='ym', y='sl', color='khu_vuc', facet_col='khu_vuc',
+                              facet_col_wrap=3, template=PLOT_TEMPLATE, color_discrete_map=COLOR_PALETTE)
+                fig.for_each_annotation(lambda a: a.update(text=a.text.split("=")[-1]))
+                fig.update_xaxes(title="Thời gian (tháng)"); fig.update_yaxes(title="Sản lượng")
+                fig.update_traces(mode='lines+markers',
+                                  hovertemplate="Tháng: %{x|%Y-%m}<br>Khu vực: %{legendgroup}<br>Sản lượng: %{y:,}<extra></extra>")
+                st.plotly_chart(fig, use_container_width=True, key="t5_small_multiples")
 
-    tre = f.groupby(['ym','khu_vuc'])['sl'].sum().reset_index()
-    if not tre.empty:
-        fig = px.area(tre, x='ym', y='sl', color='khu_vuc', template=PLOT_TEMPLATE)
-        fig.update_layout(legend_title_text="Khu vực", xaxis_title="Thời gian (tháng)", yaxis_title="Sản lượng")
-        if show_explain:
-            fig.update_traces(hovertemplate="Tháng: %{x|%Y-%m}<br>Khu vực: %{legendgroup}<br>Sản lượng: %{y:,}<extra></extra>")
-        st.plotly_chart(fig, use_container_width=True, key="t5_region_area")
+        elif view == "Cột theo quý":
+            tmp = f.copy()
+            tmp['quarter'] = pd.PeriodIndex(pd.to_datetime(dict(year=tmp['year'], month=tmp['month'], day=1)), freq='Q').astype(str)
+            q = tmp.groupby(['year','quarter','khu_vuc'])['sl'].sum().reset_index()
+            fig = px.bar(q, x='quarter', y='sl', color='khu_vuc', barmode='group',
+                         template=PLOT_TEMPLATE, color_discrete_map=COLOR_PALETTE)
+            fig.update_layout(xaxis_title="Quý (năm-quý)", yaxis_title="Sản lượng", legend_title_text="Khu vực")
+            fig.update_traces(hovertemplate="Quý: %{x}<br>Khu vực: %{legendgroup}<br>Sản lượng: %{y:,}<extra></extra>")
+            st.plotly_chart(fig, use_container_width=True, key="t5_quarter_grouped")
+
+        elif view == "Slope chart 2023→2025":
+            reg_2325 = reg[reg['year'].isin([2023, 2025])].copy()
+            if reg_2325.empty or reg_2325['year'].nunique() < 2:
+                st.info("Thiếu dữ liệu 2 mốc 2023 và 2025 để vẽ slope chart.")
+            else:
+                reg_2325['share'] = reg_2325['sl']/reg_2325.groupby('year')['sl'].transform('sum')
+                wide = reg_2325.pivot(index='khu_vuc', columns='year', values='share').reset_index()
+                long = wide.melt(id_vars='khu_vuc', var_name='Năm', value_name='Tỷ trọng')
+                fig = px.line(long, x='Năm', y='Tỷ trọng', color='khu_vuc', markers=True,
+                              template=PLOT_TEMPLATE, color_discrete_map=COLOR_PALETTE)
+                fig.update_yaxes(tickformat=',.0%'); fig.update_layout(legend_title_text="Khu vực")
+                fig.update_traces(hovertemplate="Khu vực: %{legendgroup}<br>Năm: %{x}<br>Tỷ trọng: %{y:.1%}<extra></extra>")
+                st.plotly_chart(fig, use_container_width=True, key="t5_slope_2325")
 
 # --- TAB 6: Biến động & Dự đoán ---
 with T6:
@@ -627,42 +571,98 @@ with T6:
         if show_explain:
             fig_a.update_traces(hovertemplate="Tháng: %{x|%Y-%m}<br>Sản lượng: %{y:,}<extra></extra>")
             fig_f.update_traces(hovertemplate="Thời điểm: %{x|%Y-%m}<br>Giá trị: %{y:,}<extra></extra>")
-            st.caption("Biểu đồ trái: đánh dấu điểm bất thường; Biểu đồ phải: dự đoán 3 tháng tới (đường đứt/dấu chấm).")
+            st.caption("Trái: điểm bất thường; Phải: dự đoán 3 tháng tới (đường đứt/dấu chấm).")
         st.plotly_chart(fig_a, use_container_width=True, key="t6_anomaly")
         st.plotly_chart(fig_f, use_container_width=True, key="t6_forecast")
 
-# Tải dữ liệu đã lọc
-st.markdown("---")
-colx, coly = st.columns([2,1])
-with colx:
+# --- TAB 7: Insight (Gợi ý vận hành) ---
+with T7:
+    st.subheader("Insight (Gợi ý vận hành)")
+    st.caption("Tổng hợp xu hướng theo **mùa–vùng** và **sức khỏe danh mục SKU**, kèm cảnh báo sớm.")
+
+    # ==== A) Mùa–Màu–Vùng ====
+    # Mapping season (Bắc bán cầu: Winter=12-2, Spring=3-5, Summer=6-8, Fall=9-11)
+    season_map = {12:'Đông',1:'Đông',2:'Đông', 3:'Xuân',4:'Xuân',5:'Xuân', 6:'Hè',7:'Hè',8:'Hè', 9:'Thu',10:'Thu',11:'Thu'}
+    g = f.copy()
+    g['mua'] = g['month'].map(season_map)
+
+    region_pick = st.selectbox("Chọn thị trường để xem heatmap màu theo mùa", ["Bắc Mỹ","Châu Âu"], index=0)
+    g2 = g[g['khu_vuc'].isin([region_pick])].groupby(['mua','nhom_mau'])['sl'].sum().reset_index()
+    if not g2.empty:
+        g2['share'] = g2['sl']/g2.groupby('mua')['sl'].transform('sum')
+        heat = g2.pivot(index='mua', columns='nhom_mau', values='share').fillna(0)
+        # Sắp xếp mùa theo chu kỳ
+        heat = heat.reindex(index=['Xuân','Hè','Thu','Đông'])
+        fig = px.imshow(heat, color_continuous_scale='YlGnBu', aspect='auto', origin='lower', template=PLOT_TEMPLATE)
+        fig.update_coloraxes(colorbar_title='Tỷ trọng')
+        st.plotly_chart(fig, use_container_width=True, key="t7_season_color_heat")
+        if show_explain:
+            st.caption("Heatmap cho biết **màu nào trội theo mùa** ở thị trường đã chọn.")
+
+    st.markdown("---")
+
+    # ==== B) SKU Health ====
+    # Định nghĩa SKU mới (xuất hiện lần đầu)
+    first_ym = f.groupby('ma_hang')['ym'].min().rename('first_ym')
+    ff = f.join(first_ym, on='ma_hang')
+    ff['is_new'] = ff['ym'] == ff['first_ym']
+
+    # Metrics theo tháng
+    m = ff.groupby('ym').agg(total_units=('sl','sum'), n_sku=('ma_hang','nunique')).reset_index()
+    new_per_month = ff[ff['is_new']].groupby('ym')['ma_hang'].nunique().rename('new_sku_unique').reset_index()
+    m = m.merge(new_per_month, on='ym', how='left').fillna({'new_sku_unique':0})
+    m['new_sku_share'] = m['new_sku_unique']/m['n_sku']
+    m['units_per_sku'] = m['total_units']/m['n_sku']
+    # HHI theo tháng
+    hh = ff.groupby(['ym','ma_hang'])['sl'].sum().reset_index()
+    hh['share'] = hh.groupby('ym')['sl'].transform(lambda s: s/s.sum())
+    hhi = hh.groupby('ym')['share'].apply(lambda s: (s**2).sum()).rename('hhi').reset_index()
+    m = m.merge(hhi, on='ym', how='left')
+
+    c1, c2 = st.columns([2,1])
+    with c1:
+        # Line %SKU mới + ngưỡng cảnh báo
+        threshold = st.slider("Ngưỡng cảnh báo tỷ lệ SKU mới", min_value=0, max_value=100, value=30, step=5,
+                              help="Nếu tỷ lệ SKU mới trong tháng vượt ngưỡng này thì cảnh báo.", key="t7_thr")
+        thr = threshold/100.0
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(x=m['ym'], y=m['new_sku_share'], mode='lines+markers', name='% SKU mới'))
+        fig.add_hline(y=thr, line_dash='dash', line_color=ACCENT, annotation_text=f"Ngưỡng {threshold}%")
+        fig.update_layout(template=PLOT_TEMPLATE, title="% SKU mới theo tháng", xaxis_title="Tháng", yaxis_title="% SKU mới")
+        fig.update_yaxes(tickformat=',.0%')
+        st.plotly_chart(fig, use_container_width=True, key="t7_newsku_share_line")
+    with c2:
+        # Cards nhanh theo năm
+        y = ff.groupby('year').agg(total_units=('sl','sum'),
+                                   n_sku=('ma_hang','nunique')).reset_index()
+        new_per_year = ff[ff['is_new']].groupby('year')['ma_hang'].nunique().rename('new_sku_unique').reset_index()
+        y = y.merge(new_per_year, on='year', how='left').fillna({'new_sku_unique':0})
+        y['units_per_sku'] = y['total_units']/y['n_sku']
+        # HHI theo năm
+        yhh = ff.groupby(['year','ma_hang'])['sl'].sum().reset_index()
+        yhh['share'] = yhh.groupby('year')['sl'].transform(lambda s: s/s.sum())
+        hhi_y = yhh.groupby('year')['share'].apply(lambda s: (s**2).sum()).rename('hhi').reset_index()
+        y = y.merge(hhi_y, on='year', how='left')
+        # Hiển thị
+        st.write("**Tóm tắt theo năm**")
+        for _, r in y.sort_values('year').iterrows():
+            st.markdown(f"- **{int(r['year'])}** · SKU hoạt động: **{int(r['n_sku'])}**, SKU mới: **{int(r['new_sku_unique'])}**, "
+                        f"Units/SKU: **{r['units_per_sku']:.0f}**, HHI: **{r['hhi']:.3f}**")
+
+    # Cảnh báo tháng rủi ro (new_sku_share > ngưỡng)
+    risky = m[m['new_sku_share']>thr].copy()
+    if not risky.empty:
+        st.error("⚠️ Tháng có **tỷ lệ SKU mới** vượt ngưỡng:")
+        for _, r in risky.sort_values('ym').iterrows():
+            st.markdown(f"- {r['ym'].strftime('%Y-%m')}: %SKU mới **{r['new_sku_share']:.0%}**, "
+                        f"SKU hoạt động **{int(r['n_sku'])}**, SKU mới **{int(r['new_sku_unique'])}**")
+
+    st.markdown("---")
     st.write("**Tải dữ liệu đã lọc**")
     st.download_button("⬇️ CSV", data=f.to_csv(index=False).encode('utf-8-sig'),
-                       file_name='filtered.csv', mime='text/csv', key="dl_csv")
+                       file_name='filtered.csv', mime='text/csv', key="dl_csv_insight")
     st.download_button("⬇️ Excel (DATA + tổng hợp)",
                        data=excel_download(f),
                        file_name='filtered.xlsx',
                        mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                       key="dl_xlsx")
-with coly:
-    st.caption(f"Cập nhật: {datetime.now().strftime('%Y-%m-%d %H:%M')} • Giao diện: {PLOT_TEMPLATE}")
-
-# Bảng dữ liệu (tương tác)
-st.markdown("### Bảng dữ liệu (tương tác)")
-try:
-    if AGGRID_AVAILABLE:
-        gb = GridOptionsBuilder.from_dataframe(f)
-        gb.configure_default_column(resizable=True, sortable=True, filter=True)
-        gb.configure_pagination(paginationAutoPageSize=True)
-        gb.configure_side_bar()
-        grid_options = gb.build()
-        AgGrid(
-            f,
-            gridOptions=grid_options,
-            columns_auto_size_mode=ColumnsAutoSizeMode.FIT_ALL_COLUMNS_TO_VIEW,
-            height=420,
-            key="grid_data"
-        )
-    else:
-        st.dataframe(f, use_container_width=True)
-except Exception:
-    st.dataframe(f, use_container_width=True)
+                       key="dl_xlsx_insight")
