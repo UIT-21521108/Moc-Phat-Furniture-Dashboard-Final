@@ -140,13 +140,7 @@ def add_play_controls(fig, frame_ms=700, transition_ms=300):
     )
     return fig
 
-def fmt_pct(x):
-    try:
-        return f"{x*100:.1f}%"
-    except:
-        return ""
-
-def apply_filters(base: pd.DataFrame) -> tuple[pd.DataFrame, bool, bool]:
+def apply_filters(base: pd.DataFrame):
     """Bộ lọc Sidebar – mặc định chọn TẤT CẢ (đảm bảo đúng tổng)."""
     with st.sidebar:
         st.header("Bộ lọc")
@@ -171,12 +165,12 @@ def apply_filters(base: pd.DataFrame) -> tuple[pd.DataFrame, bool, bool]:
                 if st.button("Chọn tất cả KH"):
                     st.session_state["flt_customers"] = cust_all
                     st.session_state["flt_cust_default"] = cust_all
-                    st.experimental_rerun()
+                    st.rerun()
             with c2:
                 if st.button("Bỏ chọn KH"):
                     st.session_state["flt_customers"] = []
                     st.session_state["flt_cust_default"] = []
-                    st.experimental_rerun()
+                    st.rerun()
 
         # Khu vực & Màu
         with st.expander("Khu vực & Nhóm màu", expanded=False):
@@ -192,7 +186,7 @@ def apply_filters(base: pd.DataFrame) -> tuple[pd.DataFrame, bool, bool]:
             if st.button("🔄 Xoá toàn bộ lọc"):
                 for k in ["flt_years","flt_customers","flt_regions","flt_colors","flt_sku","flt_usb","flt_cust_default"]:
                     if k in st.session_state: del st.session_state[k]
-                st.experimental_rerun()
+                st.rerun()
 
     f = base[base['year'].isin(year_sel)]
     if cust_sel:  f = f[f['khach_hang'].isin(cust_sel)]
@@ -351,10 +345,8 @@ with T1:
         st.markdown("**Tỷ trọng màu theo năm (100%)**")
         color_tot = f.groupby(['year','nhom_mau'])['sl'].sum().reset_index()
         if not color_tot.empty:
-            # Tính tỷ trọng & gắn cờ 'phổ biến nhất' theo năm
-            year_total = color_tot.groupby('year')['sl'].transform('sum')
-            color_tot['share'] = color_tot['sl'] / year_total
-            color_tot['is_top'] = color_tot.groupby('year')['sl'].transform(lambda s: s==s.max())
+            # Tính tỷ trọng theo năm
+            color_tot['share'] = color_tot['sl'] / color_tot.groupby('year')['sl'].transform('sum')
             pvt = (color_tot[['year','nhom_mau','share']]
                    .pivot(index='nhom_mau', columns='year', values='share').fillna(0)
                    .reset_index().melt(id_vars='nhom_mau', var_name='Năm', value_name='Tỷ trọng'))
@@ -369,7 +361,7 @@ with T1:
             fig.update_layout(legend_title_text="Màu")
             if show_explain:
                 fig.update_traces(hovertemplate="Năm: %{x}<br>Màu: %{legendgroup}<br>Tỷ trọng: %{y:.1%}<extra></extra>")
-                st.caption("100% stack: mỗi cột là tổng 100% của năm đó; phần màu thể hiện tỷ trọng nhóm màu. Di chuột để xem %.")            
+                st.caption("100% stack: mỗi cột là tổng 100% của năm đó; phần màu thể hiện tỷ trọng nhóm màu.")
             st.plotly_chart(fig, use_container_width=True, key="t1_colormix")
 
     with c2:
@@ -397,7 +389,6 @@ with T2:
         by_m = f.groupby(['ym','khach_hang'])['sl'].sum().reset_index()
         if not by_m.empty:
             by_m['ym_str'] = by_m['ym'].dt.strftime('%Y-%m')
-            # share & xếp hạng theo tháng
             by_m['month_total'] = by_m.groupby('ym')['sl'].transform('sum')
             by_m['share'] = by_m['sl']/by_m['month_total']
             by_m = by_m.sort_values(['ym','sl'], ascending=[True, False])
@@ -409,7 +400,6 @@ with T2:
                 animation_frame='ym_str', color='khach_hang',
                 template=PLOT_TEMPLATE, title="Bar‑race: Top khách hàng theo từng tháng",
             )
-            # Hover chi tiết
             fig.update_traces(
                 hovertemplate="Tháng: %{animation_frame}<br>KH: %{y}%{customdata[2]}<br>Sản lượng: %{x:,}<br>Tỷ trọng tháng: %{customdata[0]:.1%}<br>Thứ hạng: %{customdata[1]}<extra></extra>",
                 customdata=np.stack([by_m['share'], by_m['rank'], by_m['label']], axis=-1)
@@ -423,7 +413,6 @@ with T2:
     # === Top khách hàng theo NĂM (cột) ===
     cust_year = f.groupby(['year','khach_hang'])['sl'].sum().reset_index()
     if not cust_year.empty:
-        # share theo năm + cờ top
         cust_year['year_total'] = cust_year.groupby('year')['sl'].transform('sum')
         cust_year['share'] = cust_year['sl']/cust_year['year_total']
         cust_year = cust_year.sort_values(['year','sl'], ascending=[True, False])
@@ -434,8 +423,15 @@ with T2:
             t['label'] = np.where(t['rank']==1, " (khách hàng lớn nhất năm)", "")
             fig = px.bar(t, x='khach_hang', y='sl', title=f'Top 15 khách hàng {y}', template=PLOT_TEMPLATE)
             fig.update_layout(xaxis={'categoryorder':'total descending'}, xaxis_title="Khách hàng", yaxis_title="Sản lượng")
+            # ⚠️ Không dùng f-string cho %{x}/%{y} để tránh NameError
             fig.update_traces(
-                hovertemplate=f"Năm: {y}<br>KH: %{x}%{{customdata[1]}}<br>Sản lượng: %{y:,}<br>Tỷ trọng năm: %{customdata[0]:.1%}<br>Thứ hạng: %{customdata[2]}<extra></extra>",
+                hovertemplate=(
+                    "Năm: " + str(y) +
+                    "<br>KH: %{x}%{customdata[1]}"
+                    "<br>Sản lượng: %{y:,}"
+                    "<br>Tỷ trọng năm: %{customdata[0]:.1%}"
+                    "<br>Thứ hạng: %{customdata[2]}<extra></extra>"
+                ),
                 customdata=np.stack([t['share'], t['label'], t['rank']], axis=-1)
             )
             if show_explain:
@@ -498,8 +494,15 @@ with T3:
             s['label'] = np.where(s['rank']==1, " (SKU dẫn đầu năm)", "")
             fig = px.bar(s, x='ma_hang', y='sl', title=f'Top 20 SKU {y}', template=PLOT_TEMPLATE)
             fig.update_layout(xaxis={'categoryorder':'total descending'}, xaxis_title="SKU", yaxis_title="Sản lượng")
+            # ⚠️ Không dùng f-string cho %{x}/%{y} để tránh NameError
             fig.update_traces(
-                hovertemplate=f"Năm: {y}<br>SKU: %{x}%{{customdata[1]}}<br>Sản lượng: %{y:,}<br>Tỷ trọng năm: %{customdata[0]:.1%}<br>Thứ hạng: %{customdata[2]}<extra></extra>",
+                hovertemplate=(
+                    "Năm: " + str(y) +
+                    "<br>SKU: %{x}%{customdata[1]}"
+                    "<br>Sản lượng: %{y:,}"
+                    "<br>Tỷ trọng năm: %{customdata[0]:.1%}"
+                    "<br>Thứ hạng: %{customdata[2]}<extra></extra>"
+                ),
                 customdata=np.stack([s['share'], s['label'], s['rank']], axis=-1)
             )
             if show_explain:
@@ -522,8 +525,7 @@ with T4:
     st.subheader("Tỷ trọng màu theo năm (100%)")
     color_tot = f.groupby(['year','nhom_mau'])['sl'].sum().reset_index()
     if not color_tot.empty:
-        year_total = color_tot.groupby('year')['sl'].transform('sum')
-        color_tot['share'] = color_tot['sl']/year_total
+        color_tot['share'] = color_tot['sl']/color_tot.groupby('year')['sl'].transform('sum')
         color_tot = color_tot.sort_values(['year','share'], ascending=[True, False])
         fig = px.bar(
             color_tot, x='year', y='share', color='nhom_mau', barmode='stack',
