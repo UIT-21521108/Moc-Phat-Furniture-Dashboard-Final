@@ -1,6 +1,7 @@
 
 # app.py
-# Báo cáo kinh doanh Mộc Phát Furniture (2023–2025) – Bản gọn cho sản xuất/xuất khẩu
+# Báo cáo kinh doanh Mộc Phát Furniture (2023–2025)
+# Bản: phân tích toàn bộ dữ liệu (không loại ECOM), bộ lọc dễ dùng, giải thích biểu đồ
 # Tác giả: M365 Copilot cho Nguyễn Minh Lý
 
 import os
@@ -47,6 +48,10 @@ h1, h2, h3, h4 { font-weight: 700 !important; }
   padding: 12px 16px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.08);
   background: rgba(255,255,255,0.03);
 }
+.sidebar-box {
+  padding: 8px 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.08);
+  margin-bottom: 8px; background: rgba(255,255,255,0.02);
+}
 </style>
 """
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
@@ -86,7 +91,7 @@ def bucket_color(v: str) -> str:
     return 'OTHER'
 
 def prep_data(df: pd.DataFrame) -> pd.DataFrame:
-    """Làm sạch, tạo cờ, nhóm màu. (BỎ mọi dòng ECOM vì không bán online)"""
+    """Làm sạch, tạo cờ, nhóm màu. (KHÔNG loại ECOM: phân tích toàn bộ dữ liệu)"""
     df = df.copy()
     for c in ['khach_hang','ma_hang','mo_ta','mau_son','sl','sl_container','month','year','is_usb']:
         if c not in df.columns: df[c] = np.nan
@@ -94,9 +99,6 @@ def prep_data(df: pd.DataFrame) -> pd.DataFrame:
     df['year'] = df['year'].astype(int)
     df['month'] = df['month'].astype(int)
     df['ym'] = pd.to_datetime(dict(year=df['year'], month=df['month'], day=1))
-
-    # Loại ECOM triệt để
-    df = df[~df['khach_hang'].fillna('').str.contains('ECOM', case=False)]
 
     text = (df['mo_ta'].fillna('') + ' ' + df['mau_son'].fillna('')).str.upper()
     # Cờ USB (đặc tính sản phẩm)
@@ -121,18 +123,58 @@ def prep_data(df: pd.DataFrame) -> pd.DataFrame:
     df['nhom_mau'] = df['mau_son'].fillna('').apply(bucket_color)
     return df
 
+def apply_hover_explain(fig, hovertemplate_text: str):
+    """Áp dụng hover giải thích (tiếng Việt) khi bật tuỳ chọn 'hiển thị giải thích'."""
+    fig.update_traces(hovertemplate=hovertemplate_text + "<extra></extra>")
+    fig.update_layout(hovermode='x unified', hoverlabel=dict(namelength=-1))
+    return fig
+
 def apply_filters(base: pd.DataFrame) -> pd.DataFrame:
-    """Bộ lọc bên trái (tiếng Việt)."""
+    """Bộ lọc Sidebar – mặc định chọn TẤT CẢ (đảm bảo đúng tổng)."""
     with st.sidebar:
         st.header("Bộ lọc")
-        years = sorted(base['year'].unique())
-        year_sel = st.multiselect("Năm", options=years, default=years)
-        cust_all = sorted(base['khach_hang'].dropna().unique().tolist())
-        cust_sel = st.multiselect("Khách hàng", options=cust_all, default=cust_all[:10])
-        reg_sel  = st.multiselect("Khu vực", options=sorted(base['khu_vuc'].unique()), default=list(base['khu_vuc'].unique()))
-        color_sel= st.multiselect("Nhóm màu", options=sorted(base['nhom_mau'].unique()), default=list(base['nhom_mau'].unique()))
-        sku_query= st.text_input("Tìm theo mã sản phẩm (ví dụ: MP, MT001, BRN)")
-        usb_only = st.checkbox("Chỉ sản phẩm có cổng sạc (USB)", value=False)
+
+        # Tuỳ chọn chung
+        with st.expander("Thời gian & tuỳ chọn chung", expanded=True):
+            years = sorted(base['year'].unique())
+            year_sel = st.multiselect("Năm", options=years, default=years, key="flt_years",
+                                      help="Chọn các năm muốn xem")
+            show_explain = st.toggle("🛈 Hiển thị giải thích trên biểu đồ", value=False,
+                                     help="Bật để xem mô tả ý nghĩa biểu đồ ngay khi di chuột hoặc hiển thị đoạn giải thích ngắn bên dưới.")
+
+        # Khách hàng
+        with st.expander("Khách hàng", expanded=False):
+            cust_all = sorted(base['khach_hang'].dropna().unique().tolist())
+            # Mặc định CHỌN TẤT CẢ
+            default_cust = st.session_state.get("flt_cust_default", cust_all)
+            cust_sel = st.multiselect("Chọn khách hàng", options=cust_all, default=default_cust, key="flt_customers")
+            c1, c2 = st.columns(2)
+            with c1:
+                if st.button("Chọn tất cả KH"):
+                    st.session_state["flt_customers"] = cust_all
+                    st.session_state["flt_cust_default"] = cust_all
+                    st.experimental_rerun()
+            with c2:
+                if st.button("Bỏ chọn KH"):
+                    st.session_state["flt_customers"] = []
+                    st.session_state["flt_cust_default"] = []
+                    st.experimental_rerun()
+
+        # Khu vực & Màu
+        with st.expander("Khu vực & Nhóm màu", expanded=False):
+            reg_sel   = st.multiselect("Khu vực", options=sorted(base['khu_vuc'].unique()),
+                                       default=list(base['khu_vuc'].unique()), key="flt_regions")
+            color_sel = st.multiselect("Nhóm màu", options=sorted(base['nhom_mau'].unique()),
+                                       default=list(base['nhom_mau'].unique()), key="flt_colors")
+
+        # Tìm kiếm & tuỳ chọn
+        with st.expander("Tìm kiếm sản phẩm & tuỳ chọn khác", expanded=False):
+            sku_query = st.text_input("Tìm theo mã sản phẩm (ví dụ: MP, MT001, BRN)", key="flt_sku")
+            usb_only  = st.checkbox("Chỉ sản phẩm có cổng sạc (USB)", value=False, key="flt_usb")
+            if st.button("🔄 Xoá toàn bộ lọc"):
+                for k in ["flt_years","flt_customers","flt_regions","flt_colors","flt_sku","flt_usb","flt_cust_default"]:
+                    if k in st.session_state: del st.session_state[k]
+                st.experimental_rerun()
 
     f = base[base['year'].isin(year_sel)]
     if cust_sel:  f = f[f['khach_hang'].isin(cust_sel)]
@@ -142,7 +184,7 @@ def apply_filters(base: pd.DataFrame) -> pd.DataFrame:
         q = sku_query.strip().upper()
         f = f[f['ma_hang'].fillna('').str.upper().str.contains(q)]
     if usb_only:  f = f[f['usb_flag']]
-    return f
+    return f, show_explain
 
 def excel_download(df: pd.DataFrame) -> bytes:
     """Xuất Excel dữ liệu đã lọc + tóm tắt theo Năm/Màu/Khách/SKU."""
@@ -262,7 +304,7 @@ if raw is None or raw.empty:
     st.stop()
 
 base = prep_data(raw)
-f = apply_filters(base)
+f, show_explain = apply_filters(base)
 
 # Thẻ KPI
 add_kpi_cards(f)
@@ -281,6 +323,9 @@ with T1:
         fig = px.line(tr, x='ym', y='sl', template=PLOT_TEMPLATE)
         fig.update_traces(mode='lines+markers')
         fig.update_layout(xaxis_title="Thời gian (tháng)", yaxis_title="Sản lượng")
+        if show_explain:
+            fig = apply_hover_explain(fig, "Xu hướng sản lượng theo thời gian. Di chuột xem tháng & sản lượng.")
+            st.caption("Biểu đồ đường thể hiện sản lượng theo từng tháng. Dùng để nhận biết mùa vụ, đỉnh/đáy.")
         st.plotly_chart(fig, use_container_width=True, key="t1_trend")
 
     c1, c2 = st.columns(2)
@@ -297,8 +342,10 @@ with T1:
                 pvt, x='Năm', y='Tỷ trọng', color='nhom_mau', barmode='stack',
                 template=PLOT_TEMPLATE, color_discrete_map=COLOR_PALETTE
             )
-            fig.update_yaxes(tickformat=',.0%')
-            fig.update_layout(legend_title_text="Màu")
+            fig.update_yaxes(tickformat=',.0%'); fig.update_layout(legend_title_text="Màu")
+            if show_explain:
+                fig = apply_hover_explain(fig, "Tỷ trọng từng nhóm màu theo năm. Di chuột xem % theo năm & màu.")
+                st.caption("100% stack: mỗi cột là tổng 100% của năm đó; phần màu cho biết tỷ trọng từng nhóm.")
             st.plotly_chart(fig, use_container_width=True, key="t1_colormix")
 
     with c2:
@@ -311,6 +358,9 @@ with T1:
         m = shares.melt(id_vars='Năm', var_name='Chỉ tiêu', value_name='Tỷ lệ')
         fig = px.bar(m, x='Năm', y='Tỷ lệ', color='Chỉ tiêu', barmode='group', template=PLOT_TEMPLATE)
         fig.update_yaxes(tickformat=',.0%')
+        if show_explain:
+            fig = apply_hover_explain(fig, "Tỷ lệ sản phẩm có cổng sạc (USB) theo năm.")
+            st.caption("Dùng để theo dõi xu hướng sản phẩm có cổng sạc.")
         st.plotly_chart(fig, use_container_width=True, key="t1_usbshare")
 
 # --- TAB 2: Khách hàng ---
@@ -322,6 +372,8 @@ with T2:
         t = cust_year[cust_year['year']==y].sort_values('sl', ascending=False).head(15)
         fig = px.bar(t, x='khach_hang', y='sl', title=f'Top 15 khách hàng {y}', template=PLOT_TEMPLATE)
         fig.update_layout(xaxis={'categoryorder':'total descending'}, xaxis_title="Khách hàng", yaxis_title="Sản lượng")
+        if show_explain:
+            fig = apply_hover_explain(fig, "Top khách hàng theo sản lượng trong năm.")
         cols[i % 2].plotly_chart(fig, use_container_width=True, key=f"t2_topcust_{y}")
 
     st.markdown("---")
@@ -330,8 +382,10 @@ with T2:
     if not pareto.empty:
         fig = px.line(pareto, x=pareto.index+1, y='cum_share', markers=True, title='Tích luỹ tỷ trọng (khách hàng)', template=PLOT_TEMPLATE)
         fig.add_hline(y=0.8, line_dash='dash', line_color=ACCENT)
-        fig.update_yaxes(tickformat=',.0%')
-        fig.update_xaxes(title="Số khách hàng theo thứ hạng")
+        fig.update_yaxes(tickformat=',.0%'); fig.update_xaxes(title="Số khách hàng theo thứ hạng")
+        if show_explain:
+            fig = apply_hover_explain(fig, "Đường tích luỹ cho thấy mức độ tập trung: bao nhiêu KH tạo ra 80% sản lượng.")
+            st.caption("Nếu đạt 80% với ít KH, tập trung chăm sóc nhóm đó để ổn định đơn hàng.")
         st.plotly_chart(fig, use_container_width=True, key="t2_pareto_cust")
 
 # --- TAB 3: Sản phẩm (SKU) ---
@@ -343,6 +397,8 @@ with T3:
         s = sku_year[sku_year['year']==y].sort_values('sl', ascending=False).head(20)
         fig = px.bar(s, x='ma_hang', y='sl', title=f'Top 20 SKU {y}', template=PLOT_TEMPLATE)
         fig.update_layout(xaxis={'categoryorder':'total descending'}, xaxis_title="SKU", yaxis_title="Sản lượng")
+        if show_explain:
+            fig = apply_hover_explain(fig, "Top SKU theo sản lượng trong năm.")
         cols[i % 2].plotly_chart(fig, use_container_width=True, key=f"t3_topsku_{y}")
 
     st.markdown("---")
@@ -351,8 +407,9 @@ with T3:
     if not psku.empty:
         fig = px.line(psku, x=psku.index+1, y='cum_share', markers=True, title='Tích luỹ tỷ trọng (SKU)', template=PLOT_TEMPLATE)
         fig.add_hline(y=0.8, line_dash='dash', line_color=ACCENT)
-        fig.update_yaxes(tickformat=',.0%')
-        fig.update_xaxes(title="Số SKU theo thứ hạng")
+        fig.update_yaxes(tickformat=',.0%'); fig.update_xaxes(title="Số SKU theo thứ hạng")
+        if show_explain:
+            fig = apply_hover_explain(fig, "Đường tích luỹ cho thấy mức độ tập trung theo SKU.")
         st.plotly_chart(fig, use_container_width=True, key="t3_pareto_sku")
 
 # --- TAB 4: Màu & Tay nắm ---
@@ -369,8 +426,9 @@ with T4:
             pvt, x='Năm', y='Tỷ trọng', color='nhom_mau', barmode='stack',
             template=PLOT_TEMPLATE, color_discrete_map=COLOR_PALETTE
         )
-        fig.update_yaxes(tickformat=',.0%')
-        fig.update_layout(legend_title_text="Màu")
+        fig.update_yaxes(tickformat=',.0%'); fig.update_layout(legend_title_text="Màu")
+        if show_explain:
+            fig = apply_hover_explain(fig, "So sánh cơ cấu nhóm màu theo từng năm.")
         st.plotly_chart(fig, use_container_width=True, key="t4_colormix")
 
     st.markdown("---")
@@ -380,6 +438,8 @@ with T4:
         fig = px.line(trc, x='ym', y='sl', color='nhom_mau', template=PLOT_TEMPLATE,
                       color_discrete_map=COLOR_PALETTE)
         fig.update_layout(legend_title_text="Màu", xaxis_title="Thời gian (tháng)", yaxis_title="Sản lượng")
+        if show_explain:
+            fig = apply_hover_explain(fig, "Theo dõi mùa vụ theo từng nhóm màu.")
         st.plotly_chart(fig, use_container_width=True, key="t4_color_trend")
 
     st.markdown("---")
@@ -396,8 +456,9 @@ with T4:
             'pk_go': 'Gỗ'
         })
         fig = px.bar(m, x='year', y='Tỷ lệ', color='Phụ kiện', barmode='group', template=PLOT_TEMPLATE)
-        fig.update_yaxes(tickformat=',.0%')
-        fig.update_layout(xaxis_title="Năm")
+        fig.update_yaxes(tickformat=',.0%'); fig.update_layout(xaxis_title="Năm")
+        if show_explain:
+            fig = apply_hover_explain(fig, "Tỷ lệ xuất hiện các loại tay nắm/phụ kiện theo năm.")
         st.plotly_chart(fig, use_container_width=True, key="t4_hardware")
 
 # --- TAB 5: Khu vực ---
@@ -408,14 +469,17 @@ with T5:
         pvt = reg.pivot(index='khu_vuc', columns='year', values='sl').fillna(0)
         pvt = pvt.div(pvt.sum(axis=0), axis=1).reset_index().melt(id_vars='khu_vuc', var_name='Năm', value_name='Tỷ trọng')
         fig = px.bar(pvt, x='Năm', y='Tỷ trọng', color='khu_vuc', barmode='group', template=PLOT_TEMPLATE)
-        fig.update_yaxes(tickformat=',.0%')
-        fig.update_layout(legend_title_text="Khu vực")
+        fig.update_yaxes(tickformat=',.0%'); fig.update_layout(legend_title_text="Khu vực")
+        if show_explain:
+            fig = apply_hover_explain(fig, "Cơ cấu thị trường theo năm.")
         st.plotly_chart(fig, use_container_width=True, key="t5_region_mix")
 
     tre = f.groupby(['ym','khu_vuc'])['sl'].sum().reset_index()
     if not tre.empty:
         fig = px.area(tre, x='ym', y='sl', color='khu_vuc', template=PLOT_TEMPLATE)
         fig.update_layout(legend_title_text="Khu vực", xaxis_title="Thời gian (tháng)", yaxis_title="Sản lượng")
+        if show_explain:
+            fig = apply_hover_explain(fig, "Diễn biến sản lượng theo thời gian cho từng khu vực.")
         st.plotly_chart(fig, use_container_width=True, key="t5_region_area")
 
 # --- TAB 6: Biến động & Dự đoán ---
@@ -424,6 +488,10 @@ with T6:
     tr_all = f.groupby('ym')['sl'].sum().reset_index().sort_values('ym')
     fig_a, fig_f = anomaly_and_forecast(tr_all, 'Tổng sản lượng')
     if fig_a:
+        if show_explain:
+            fig_a = apply_hover_explain(fig_a, "Điểm bất thường (so với đường mượt 3 tháng).")
+            fig_f = apply_hover_explain(fig_f, "Dự đoán 3 tháng tới: đường đứt (EWMA) & chấm chấm (TB 3 tháng).")
+            st.caption("Gợi ý: dùng để phát hiện tháng bất thường và phác hoạ xu hướng gần hạn.")
         st.plotly_chart(fig_a, use_container_width=True, key="t6_anomaly")
         st.plotly_chart(fig_f, use_container_width=True, key="t6_forecast")
 
@@ -442,7 +510,7 @@ with colx:
 with coly:
     st.caption(f"Cập nhật: {datetime.now().strftime('%Y-%m-%d %H:%M')} • Giao diện: {PLOT_TEMPLATE}")
 
-# Bảng dữ liệu (tuỳ chọn – nếu bạn muốn cho ra cuối trang)
+# Bảng dữ liệu (tuỳ chọn)
 st.markdown("### Bảng dữ liệu (tương tác)")
 try:
     if AGGRID_AVAILABLE:
