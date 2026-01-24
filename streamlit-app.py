@@ -548,4 +548,3 @@ with colx:
                        mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
 with coly:
     st.caption(f"Cập nhật: {datetime.now().strftime('%Y-%m-%d %H:%M')} • Giao diện: {PLOT_TEMPLATE}")
-``
