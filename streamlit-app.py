@@ -99,7 +99,7 @@ def prep_data(df: pd.DataFrame) -> pd.DataFrame:
     df = df[~df['khach_hang'].fillna('').str.contains('ECOM', case=False)]
 
     text = (df['mo_ta'].fillna('') + ' ' + df['mau_son'].fillna('')).str.upper()
-    # Cờ USB giữ lại (vì là đặc tính sản phẩm), NHƯNG chỉ dùng nếu cần nội bộ
+    # Cờ USB (đặc tính sản phẩm)
     df['usb_flag'] = df.get('is_usb', '').astype(str).str.contains('USB', case=False) | \
                      df['ma_hang'].fillna('').astype(str).str.contains('USB', case=False)
 
@@ -267,7 +267,7 @@ f = apply_filters(base)
 # Thẻ KPI
 add_kpi_cards(f)
 
-# =============== CÁC TAB (không có Container, 100% tiếng Việt) ===============
+# =============== CÁC TAB (không Container, 100% tiếng Việt) ===============
 T1, T2, T3, T4, T5, T6 = st.tabs([
     "Tổng quan", "Khách hàng", "Sản phẩm (SKU)", "Màu & Tay nắm",
     "Khu vực", "Biến động & Dự đoán"
@@ -281,7 +281,7 @@ with T1:
         fig = px.line(tr, x='ym', y='sl', template=PLOT_TEMPLATE)
         fig.update_traces(mode='lines+markers')
         fig.update_layout(xaxis_title="Thời gian (tháng)", yaxis_title="Sản lượng")
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, use_container_width=True, key="t1_trend")
 
     c1, c2 = st.columns(2)
     with c1:
@@ -299,7 +299,7 @@ with T1:
             )
             fig.update_yaxes(tickformat=',.0%')
             fig.update_layout(legend_title_text="Màu")
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, use_container_width=True, key="t1_colormix")
 
     with c2:
         st.markdown("**Đặc tính sản phẩm (tỷ lệ cổng sạc USB theo năm)**")
@@ -311,7 +311,7 @@ with T1:
         m = shares.melt(id_vars='Năm', var_name='Chỉ tiêu', value_name='Tỷ lệ')
         fig = px.bar(m, x='Năm', y='Tỷ lệ', color='Chỉ tiêu', barmode='group', template=PLOT_TEMPLATE)
         fig.update_yaxes(tickformat=',.0%')
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, use_container_width=True, key="t1_usbshare")
 
 # --- TAB 2: Khách hàng ---
 with T2:
@@ -322,7 +322,7 @@ with T2:
         t = cust_year[cust_year['year']==y].sort_values('sl', ascending=False).head(15)
         fig = px.bar(t, x='khach_hang', y='sl', title=f'Top 15 khách hàng {y}', template=PLOT_TEMPLATE)
         fig.update_layout(xaxis={'categoryorder':'total descending'}, xaxis_title="Khách hàng", yaxis_title="Sản lượng")
-        cols[i % 2].plotly_chart(fig, use_container_width=True)
+        cols[i % 2].plotly_chart(fig, use_container_width=True, key=f"t2_topcust_{y}")
 
     st.markdown("---")
     st.subheader("Quy tắc 80/20 theo khách hàng")
@@ -332,7 +332,7 @@ with T2:
         fig.add_hline(y=0.8, line_dash='dash', line_color=ACCENT)
         fig.update_yaxes(tickformat=',.0%')
         fig.update_xaxes(title="Số khách hàng theo thứ hạng")
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, use_container_width=True, key="t2_pareto_cust")
 
 # --- TAB 3: Sản phẩm (SKU) ---
 with T3:
@@ -343,7 +343,7 @@ with T3:
         s = sku_year[sku_year['year']==y].sort_values('sl', ascending=False).head(20)
         fig = px.bar(s, x='ma_hang', y='sl', title=f'Top 20 SKU {y}', template=PLOT_TEMPLATE)
         fig.update_layout(xaxis={'categoryorder':'total descending'}, xaxis_title="SKU", yaxis_title="Sản lượng")
-        cols[i % 2].plotly_chart(fig, use_container_width=True)
+        cols[i % 2].plotly_chart(fig, use_container_width=True, key=f"t3_topsku_{y}")
 
     st.markdown("---")
     st.subheader("Quy tắc 80/20 theo SKU")
@@ -353,7 +353,7 @@ with T3:
         fig.add_hline(y=0.8, line_dash='dash', line_color=ACCENT)
         fig.update_yaxes(tickformat=',.0%')
         fig.update_xaxes(title="Số SKU theo thứ hạng")
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, use_container_width=True, key="t3_pareto_sku")
 
 # --- TAB 4: Màu & Tay nắm ---
 with T4:
@@ -371,7 +371,7 @@ with T4:
         )
         fig.update_yaxes(tickformat=',.0%')
         fig.update_layout(legend_title_text="Màu")
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, use_container_width=True, key="t4_colormix")
 
     st.markdown("---")
     st.subheader("Xu hướng sản lượng theo tháng – theo màu")
@@ -380,7 +380,7 @@ with T4:
         fig = px.line(trc, x='ym', y='sl', color='nhom_mau', template=PLOT_TEMPLATE,
                       color_discrete_map=COLOR_PALETTE)
         fig.update_layout(legend_title_text="Màu", xaxis_title="Thời gian (tháng)", yaxis_title="Sản lượng")
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, use_container_width=True, key="t4_color_trend")
 
     st.markdown("---")
     st.subheader("Tay nắm/phụ kiện theo năm")
@@ -398,7 +398,7 @@ with T4:
         fig = px.bar(m, x='year', y='Tỷ lệ', color='Phụ kiện', barmode='group', template=PLOT_TEMPLATE)
         fig.update_yaxes(tickformat=',.0%')
         fig.update_layout(xaxis_title="Năm")
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, use_container_width=True, key="t4_hardware")
 
 # --- TAB 5: Khu vực ---
 with T5:
@@ -410,13 +410,13 @@ with T5:
         fig = px.bar(pvt, x='Năm', y='Tỷ trọng', color='khu_vuc', barmode='group', template=PLOT_TEMPLATE)
         fig.update_yaxes(tickformat=',.0%')
         fig.update_layout(legend_title_text="Khu vực")
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, use_container_width=True, key="t5_region_mix")
 
     tre = f.groupby(['ym','khu_vuc'])['sl'].sum().reset_index()
     if not tre.empty:
         fig = px.area(tre, x='ym', y='sl', color='khu_vuc', template=PLOT_TEMPLATE)
         fig.update_layout(legend_title_text="Khu vực", xaxis_title="Thời gian (tháng)", yaxis_title="Sản lượng")
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, use_container_width=True, key="t5_region_area")
 
 # --- TAB 6: Biến động & Dự đoán ---
 with T6:
@@ -424,8 +424,8 @@ with T6:
     tr_all = f.groupby('ym')['sl'].sum().reset_index().sort_values('ym')
     fig_a, fig_f = anomaly_and_forecast(tr_all, 'Tổng sản lượng')
     if fig_a:
-        st.plotly_chart(fig_a, use_container_width=True)
-        st.plotly_chart(fig_f, use_container_width=True)
+        st.plotly_chart(fig_a, use_container_width=True, key="t6_anomaly")
+        st.plotly_chart(fig_f, use_container_width=True, key="t6_forecast")
 
 # Tải dữ liệu đã lọc
 st.markdown("---")
@@ -433,10 +433,32 @@ colx, coly = st.columns([2,1])
 with colx:
     st.write("**Tải dữ liệu đã lọc**")
     st.download_button("⬇️ CSV", data=f.to_csv(index=False).encode('utf-8-sig'),
-                       file_name='filtered.csv', mime='text/csv')
+                       file_name='filtered.csv', mime='text/csv', key="dl_csv")
     st.download_button("⬇️ Excel (DATA + tổng hợp)",
                        data=excel_download(f),
                        file_name='filtered.xlsx',
-                       mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+                       mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                       key="dl_xlsx")
 with coly:
     st.caption(f"Cập nhật: {datetime.now().strftime('%Y-%m-%d %H:%M')} • Giao diện: {PLOT_TEMPLATE}")
+
+# Bảng dữ liệu (tuỳ chọn – nếu bạn muốn cho ra cuối trang)
+st.markdown("### Bảng dữ liệu (tương tác)")
+try:
+    if AGGRID_AVAILABLE:
+        gb = GridOptionsBuilder.from_dataframe(f)
+        gb.configure_default_column(resizable=True, sortable=True, filter=True)
+        gb.configure_pagination(paginationAutoPageSize=True)
+        gb.configure_side_bar()
+        grid_options = gb.build()
+        AgGrid(
+            f,
+            gridOptions=grid_options,
+            columns_auto_size_mode=ColumnsAutoSizeMode.FIT_ALL_COLUMNS_TO_VIEW,
+            height=420,
+            key="grid_data"
+        )
+    else:
+        st.dataframe(f, use_container_width=True)
+except Exception:
+    st.dataframe(f, use_container_width=True)
