@@ -91,23 +91,26 @@ def prep_data(df: pd.DataFrame) -> pd.DataFrame:
     df['month'] = df['month'].astype(int)
     df['ym'] = pd.to_datetime(dict(year=df['year'], month=df['month'], day=1))
 
+    # Gộp mô tả + màu sơn để dò keyword, ép UPPER
     text = (df['mo_ta'].fillna('') + ' ' + df['mau_son'].fillna('')).str.upper()
-    df['usb_flag'] = df.get('is_usb', '').astype(str).str.contains('USB', case=False) | \
-                     df['ma_hang'].fillna('').astype(str).str.contains('USB', case=False)
 
-    # Khu vực: heuristic gắn với tập khách NA/EU/Other
+    # Cờ USB (đặc tính sản phẩm)
+    df['usb_flag'] = df.get('is_usb', '').astype(str).str.contains('USB', case=False, na=False) | \
+                     df['ma_hang'].fillna('').astype(str).str.contains('USB', case=False, na=False)
+
+    # Khu vực: heuristic gắn với tập khách NA/EU/Other (giữ cả ECOM)
     kh = df['khach_hang'].fillna('')
     conds = [
-        kh.str.contains('TJX EUROPE|TK', case=False),
-        kh.str.contains('TJMAXX|MARSHALL|HOMEGOODS|HOMESENSE|WINNERS|MMX|TJX UK|ECOM', case=False)
+        kh.str.contains('TJX EUROPE|TK', case=False, na=False),
+        kh.str.contains('TJMAXX|MARSHALL|HOMEGOODS|HOMESENSE|WINNERS|MMX|TJX UK|ECOM', case=False, na=False)
     ]
     df['khu_vuc'] = np.select(conds, ['Châu Âu','Bắc Mỹ'], default='Khác')
 
-    # Tay nắm/phụ kiện
-    df['pk_dong_co'] = text.str.contains('ANTIQUE BRASS')
-    df['pk_bronze']  = text.str_contains('ANTIQUE BRONZE')
-    df['pk_niken']   = text.str.contains('NICKEL')
-    df['pk_go']      = text.str.contains('WOOD HARDWARE')
+    # Tay nắm/phụ kiện (từ mô tả) — đã VÁ str.contains + na=False, regex=False
+    df['pk_dong_co'] = text.str.contains('ANTIQUE BRASS', na=False, regex=False)
+    df['pk_bronze']  = text.str.contains('ANTIQUE BRONZE', na=False, regex=False)  # FIXED
+    df['pk_niken']   = text.str.contains('NICKEL', na=False, regex=False)
+    df['pk_go']      = text.str.contains('WOOD HARDWARE', na=False, regex=False)
 
     # Nhóm màu
     df['nhom_mau'] = df['mau_son'].fillna('').apply(bucket_color)
@@ -176,7 +179,7 @@ def apply_filters(base: pd.DataFrame):
     if color_sel: f = f[f['nhom_mau'].isin(color_sel)]
     if sku_query:
         q = sku_query.strip().upper()
-        f = f[f['ma_hang'].fillna('').str.upper().str.contains(q)]
+        f = f[f['ma_hang'].fillna('').str.upper().str.contains(q, na=False)]
     if usb_only:  f = f[f['usb_flag']]
     return f, show_explain, animate_on
 
@@ -502,7 +505,7 @@ with T4:
         fig.update_traces(hovertemplate="Năm: %{x}<br>Phụ kiện: %{legendgroup}<br>Tỷ lệ xuất hiện: %{y:.1%}<extra></extra>")
         st.plotly_chart(fig, use_container_width=True, key="t4_hardware")
 
-# --- TAB 5: Khu vực (đổi mới: mặc định Cột 100% theo năm) ---
+# --- TAB 5: Khu vực (mặc định Cột 100% theo năm) ---
 with T5:
     st.subheader("Khu vực")
     view = st.radio("Chọn cách hiển thị",
@@ -581,7 +584,6 @@ with T7:
     st.caption("Tổng hợp xu hướng theo **mùa–vùng** và **sức khỏe danh mục SKU**, kèm cảnh báo sớm.")
 
     # ==== A) Mùa–Màu–Vùng ====
-    # Mapping season (Bắc bán cầu: Winter=12-2, Spring=3-5, Summer=6-8, Fall=9-11)
     season_map = {12:'Đông',1:'Đông',2:'Đông', 3:'Xuân',4:'Xuân',5:'Xuân', 6:'Hè',7:'Hè',8:'Hè', 9:'Thu',10:'Thu',11:'Thu'}
     g = f.copy()
     g['mua'] = g['month'].map(season_map)
@@ -591,7 +593,6 @@ with T7:
     if not g2.empty:
         g2['share'] = g2['sl']/g2.groupby('mua')['sl'].transform('sum')
         heat = g2.pivot(index='mua', columns='nhom_mau', values='share').fillna(0)
-        # Sắp xếp mùa theo chu kỳ
         heat = heat.reindex(index=['Xuân','Hè','Thu','Đông'])
         fig = px.imshow(heat, color_continuous_scale='YlGnBu', aspect='auto', origin='lower', template=PLOT_TEMPLATE)
         fig.update_coloraxes(colorbar_title='Tỷ trọng')
@@ -602,18 +603,15 @@ with T7:
     st.markdown("---")
 
     # ==== B) SKU Health ====
-    # Định nghĩa SKU mới (xuất hiện lần đầu)
     first_ym = f.groupby('ma_hang')['ym'].min().rename('first_ym')
     ff = f.join(first_ym, on='ma_hang')
     ff['is_new'] = ff['ym'] == ff['first_ym']
 
-    # Metrics theo tháng
     m = ff.groupby('ym').agg(total_units=('sl','sum'), n_sku=('ma_hang','nunique')).reset_index()
     new_per_month = ff[ff['is_new']].groupby('ym')['ma_hang'].nunique().rename('new_sku_unique').reset_index()
     m = m.merge(new_per_month, on='ym', how='left').fillna({'new_sku_unique':0})
     m['new_sku_share'] = m['new_sku_unique']/m['n_sku']
     m['units_per_sku'] = m['total_units']/m['n_sku']
-    # HHI theo tháng
     hh = ff.groupby(['ym','ma_hang'])['sl'].sum().reset_index()
     hh['share'] = hh.groupby('ym')['sl'].transform(lambda s: s/s.sum())
     hhi = hh.groupby('ym')['share'].apply(lambda s: (s**2).sum()).rename('hhi').reset_index()
@@ -621,7 +619,6 @@ with T7:
 
     c1, c2 = st.columns([2,1])
     with c1:
-        # Line %SKU mới + ngưỡng cảnh báo
         threshold = st.slider("Ngưỡng cảnh báo tỷ lệ SKU mới", min_value=0, max_value=100, value=30, step=5,
                               help="Nếu tỷ lệ SKU mới trong tháng vượt ngưỡng này thì cảnh báo.", key="t7_thr")
         thr = threshold/100.0
@@ -632,24 +629,20 @@ with T7:
         fig.update_yaxes(tickformat=',.0%')
         st.plotly_chart(fig, use_container_width=True, key="t7_newsku_share_line")
     with c2:
-        # Cards nhanh theo năm
         y = ff.groupby('year').agg(total_units=('sl','sum'),
                                    n_sku=('ma_hang','nunique')).reset_index()
         new_per_year = ff[ff['is_new']].groupby('year')['ma_hang'].nunique().rename('new_sku_unique').reset_index()
         y = y.merge(new_per_year, on='year', how='left').fillna({'new_sku_unique':0})
         y['units_per_sku'] = y['total_units']/y['n_sku']
-        # HHI theo năm
         yhh = ff.groupby(['year','ma_hang'])['sl'].sum().reset_index()
         yhh['share'] = yhh.groupby('year')['sl'].transform(lambda s: s/s.sum())
         hhi_y = yhh.groupby('year')['share'].apply(lambda s: (s**2).sum()).rename('hhi').reset_index()
         y = y.merge(hhi_y, on='year', how='left')
-        # Hiển thị
         st.write("**Tóm tắt theo năm**")
         for _, r in y.sort_values('year').iterrows():
             st.markdown(f"- **{int(r['year'])}** · SKU hoạt động: **{int(r['n_sku'])}**, SKU mới: **{int(r['new_sku_unique'])}**, "
                         f"Units/SKU: **{r['units_per_sku']:.0f}**, HHI: **{r['hhi']:.3f}**")
 
-    # Cảnh báo tháng rủi ro (new_sku_share > ngưỡng)
     risky = m[m['new_sku_share']>thr].copy()
     if not risky.empty:
         st.error("⚠️ Tháng có **tỷ lệ SKU mới** vượt ngưỡng:")
