@@ -184,223 +184,236 @@ def add_play_controls(fig, frame_ms=700, transition_ms=300):
     )
     return fig
 
-# ====== TIỆN ÍCH DIỄN GIẢI ======
+
+# ====== TIỆN ÍCH DIỄN GIẢI (iPOS-style narrative: Executive summary → Drivers/Headwinds → Action) ======
 def _fmt(n):
     try: return f"{int(n):,}"
-    except: return f"{n:,}"
+    except: 
+        try: return f"{n:,.0f}"
+        except: return str(n)
 
+def _pct(x, digits=1):
+    try:
+        return f"{x*100:.{digits}f}%"
+    except:
+        return ""
+
+def _delta(a, b):
+    """Trả về (delta_abs, delta_pct) với b là gốc so sánh (b→a)."""
+    if b is None or pd.isna(b): return None, None
+    da = (a - b)
+    dp = None if b == 0 else da / b
+    return da, dp
+
+def _drivers_delta(df_now: pd.DataFrame, df_prev: pd.DataFrame, key: str, top=3):
+    """Tính đóng góp tăng/giảm theo nhóm (key) giữa 2 kỳ (now vs prev)."""
+    g_now = df_now.groupby(key)['sl'].sum()
+    g_prev = df_prev.groupby(key)['sl'].sum()
+    keys = sorted(set(g_now.index) | set(g_prev.index))
+    diff = pd.Series({k: g_now.get(k, 0) - g_prev.get(k, 0) for k in keys}).sort_values(ascending=False)
+    up = [(k, diff[k]) for k in diff.head(top).index if diff[k] > 0]
+    dn = [(k, diff[k]) for k in diff.tail(top).index if diff[k] < 0]
+    return up, dn
+
+def _write_block(title, lines):
+    st.markdown(f"**📌 {title}**")
+    if isinstance(lines, (list, tuple)):
+        for li in lines:
+            st.markdown(f"- {li}")
+    else:
+        st.markdown(lines)
+
+# ==== 1) Xu hướng theo tháng ====
 def explain_trend_monthly(df):
+    """
+    iPOS-style:
+    - Executive summary: đỉnh/đáy, MoM & YoY tháng mới nhất, YTD vs PYTD, MA3 xu hướng ngắn hạn.
+    - Drivers/Headwinds: đóng góp tăng/giảm theo Khu vực, Nhóm màu, Khách hàng, SKU (MoM).
+    - Risk & Action: khuyến nghị điều độ, vật tư, ưu tiên SKU/khách trụ cột.
+    """
     if df.empty: return
     s = df.groupby('ym')['sl'].sum().sort_index()
     if s.empty: return
+
+    last_ym = s.index.max()
+    prev_ym = last_ym - pd.offsets.MonthBegin(1)
+
+    # Executive summary
     peak_m, peak_v = s.idxmax(), s.max()
     low_m,  low_v  = s.idxmin(), s.min()
-    last3 = s.tail(3).sum(); prev3 = s.tail(6).head(3).sum()
-    delta3 = None if prev3==0 else (last3-prev3)/prev3*100
-    st.markdown(
-        f"**📌 Diễn giải:** Tháng cao nhất **{peak_m:%Y-%m}** đạt **{_fmt(peak_v)}**; "
-        f"tháng thấp nhất **{low_m:%Y-%m}** **{_fmt(low_v)}**. "
-        + (f"3 tháng gần nhất **{_fmt(last3)}** so với 3 tháng trước **{_fmt(prev3)}** "
-           f"→ _{'tăng' if delta3 and delta3>0 else 'giảm' if delta3 and delta3<0 else 'ổn định'} "
-           f"{'' if delta3 is None else f'{delta3:+.1f}%'}_.")
-    )
 
+    mom_abs = mom_pct = yoy_abs = yoy_pct = None
+    try:
+        mom_abs, mom_pct = _delta(s.loc[last_ym], s.loc[prev_ym])
+    except: pass
+    try:
+        yoy_abs, yoy_pct = _delta(s.loc[last_ym], s.loc[last_ym - pd.offsets.DateOffset(years=1)])
+    except: pass
+
+    y, m = last_ym.year, last_ym.month
+    ytd  = df[(df['year']==y)   & (df['month']<=m)]['sl'].sum()
+    pytd = df[(df['year']==y-1) & (df['month']<=m)]['sl'].sum()
+    dy_abs, dy_pct = _delta(ytd, pytd)
+
+    mavg3 = s.rolling(3).mean()
+    slope = None
+    if len(mavg3) >= 3:
+        slope = mavg3.iloc[-1] - mavg3.iloc[-3]
+    trend_txt = "tăng" if (slope is not None and slope > 0) else ("giảm" if (slope is not None and slope < 0) else "ổn định")
+
+    _write_block("Executive summary", [
+        f"Đỉnh chuỗi: **{peak_m:%Y-%m} – {_fmt(peak_v)}** • Đáy: **{low_m:%Y-%m} – {_fmt(low_v)}**.",
+        f"Tháng mới nhất **{last_ym:%Y-%m}**: "
+        + (f"**MoM {mom_abs:+,} ({_pct(mom_pct)})**" if mom_abs is not None else "MoM n/a")
+        + " • "
+        + (f"**YoY {yoy_abs:+,} ({_pct(yoy_pct)})**" if yoy_abs is not None else "YoY n/a")
+        + f" • Xu hướng MA3: **{trend_txt}**.",
+        f"**YTD {y}**: **{_fmt(ytd)}** so với **PYTD {y-1}: {_fmt(pytd)}**"
+        + (f" → **{('tăng' if dy_abs and dy_abs>0 else 'giảm')} {abs(dy_abs):,} ({_pct(dy_pct)})**." if dy_abs is not None else ".")
+    ])
+
+    # Drivers/Headwinds (MoM)
+    if prev_ym in s.index:
+        df_now  = df[df['ym']==last_ym]
+        df_prev = df[df['ym']==prev_ym]
+
+        drv = []
+        for key, label in [('khu_vuc','Khu vực'), ('nhom_mau','Nhóm màu'),
+                           ('khach_hang','Khách hàng'), ('ma_hang','SKU')]:
+            up, dn = _drivers_delta(df_now, df_prev, key, top=3)
+            up_txt = ", ".join([f"{k} (+{_fmt(v)})" for k, v in up]) if up else "—"
+            dn_txt = ", ".join([f"{k} ({_fmt(v)})" for k, v in dn]) if dn else "—"
+            drv.append(f"**{label}** → Tăng: {up_txt} • Giảm: {dn_txt}")
+
+        _write_block("Drivers & Headwinds (đóng góp MoM)", drv)
+
+    _write_block("Rủi ro & Khuyến nghị",
+        [
+            "MoM biến động mạnh ở tháng sát giao hàng → **đệm năng lực** (nhân sự, sơn, QC) và **điều độ linh hoạt**.",
+            "YTD/PYTD giảm → ưu tiên **SKU/khách trụ cột**, cân đối lại **đuôi dài** để tránh phân mảnh lô."
+        ])
+
+# ==== 2) Cơ cấu màu 100% theo năm ====
 def explain_color_100(col_df):
     if col_df.empty: return
     x = col_df.groupby(['year','nhom_mau'])['sl'].sum().reset_index()
     x['share'] = x['sl']/x.groupby('year')['sl'].transform('sum')
-    txt = []
+
+    tops=[]
     for y, g in x.groupby('year'):
-        g = g.sort_values('share', ascending=False).head(3)
-        tri = ", ".join([f"{r['nhom_mau'].title()} {_fmt(round(r['share']*100,1))}%" for _,r in g.iterrows()])
-        txt.append(f"**{y}:** Top màu {tri}.")
-    st.markdown("**📌 Diễn giải:** " + " ".join(txt))
+        g=g.sort_values('share', ascending=False).head(3)
+        tri=", ".join([f"{r['nhom_mau'].title()} ({_pct(r['share'])})" for _,r in g.iterrows()])
+        tops.append(f"**{y}**: {tri}")
+    _write_block("Top nhóm màu theo năm (share)", tops)
 
+    # Dịch chuyển share giữa các năm liên tiếp
+    moves=[]
+    for y in sorted(x['year'].unique()):
+        if (y-1) in x['year'].unique():
+            p=x[x['year']==y-1].set_index('nhom_mau')['share']
+            c=x[x['year']==y].set_index('nhom_mau')['share']
+            allc=sorted(set(p.index)|set(c.index))
+            diff=pd.Series({k:c.get(k,0)-p.get(k,0) for k in allc}).sort_values(ascending=False)
+            inc=", ".join([f"{k} (+{_pct(v)})" for k,v in diff.head(2).items() if v>0]) or "—"
+            dec=", ".join([f"{k} ({_pct(v)})" for k,v in diff.tail(2).items() if v<0]) or "—"
+            moves.append(f"**{y-1}→{y}**: tăng {inc}; giảm {dec}.")
+    if moves: _write_block("Chuyển dịch cơ cấu (Y/Y)", moves)
+
+    _write_block("Hàm ý cung ứng & vận hành", [
+        "Chốt **kế hoạch pha sơn/veneer** sớm cho nhóm màu tăng nhanh; dọn **định mức** cho nhóm giảm để tránh ứ tồn.",
+        "Gom đơn theo **cụm màu/hardware** để giảm set‑up sơn/phụ kiện."
+    ])
+
+# ==== 3) Tỷ lệ USB theo năm ====
 def explain_usb_share(df):
-    y = sorted(df['year'].unique())
+    y=sorted(df['year'].unique())
     if not y: return
-    shares = {yy: df[df['year']==yy]['usb_flag'].mean() for yy in y}
-    ytxt = " • ".join([f"**{yy}**: {shares[yy]*100:.1f}%" for yy in y])
-    st.markdown(f"**📌 Diễn giải:** Tỷ lệ sản phẩm có cổng sạc (USB) — {ytxt}.")
+    shares=[(yy, df[df['year']==yy]['usb_flag'].mean()) for yy in y]
+    seq=" • ".join([f"**{yy}**: {_pct(p)}" for yy,p in shares])
+    _write_block("Tỷ lệ sản phẩm có cổng sạc (USB)", [
+        f"Khuynh hướng theo năm: {seq}.",
+        "Gợi ý điều độ: chốt **kiểm tra an toàn điện** và **vật tư điện** theo mùa đỉnh để tránh nghẽn."
+    ])
 
+# ==== 4) Top theo năm (Khách hàng/SKU) – mức độ tập trung & thay đổi ====
 def explain_top_list(df, by_col, title):
     if df.empty: return
-    df = df.copy()
-    df['year_total'] = df.groupby('year')['sl'].transform('sum')
-    df['share'] = df['sl']/df['year_total']
-    parts = []
-    for y, g in df.groupby('year'):
-        g = g.sort_values('sl', ascending=False).head(3)
-        tri = "; ".join([f"{r[by_col]} ({_fmt(r['sl'])} – {r['share']*100:.1f}%)" for _,r in g.iterrows()])
-        parts.append(f"**{y}:** {tri}")
-    st.markdown(f"**📌 Diễn giải – {title}:** " + " • ".join(parts))
+    g=df.copy()
+    g['year_total']=g.groupby('year')['sl'].transform('sum')
+    g['share']=g['sl']/g['year_total']
+    lines=[]
+    for y, d in g.groupby('year'):
+        d=d.sort_values('sl', ascending=False)
+        cr3=d['share'].head(3).sum(); cr5=d['share'].head(5).sum()
+        mover_txt="—"
+        if (y-1) in g['year'].unique():
+            prev=g[g['year']==y-1].set_index(by_col)['share']
+            cur =d.set_index(by_col)['share']
+            diff=(cur-prev).dropna().sort_values(ascending=False)
+            up=", ".join([f"{k} (+{_pct(v)})" for k,v in diff.head(2).items() if v>0]) or "—"
+            dn=", ".join([f"{k} ({_pct(v)})" for k,v in diff.tail(2).items() if v<0]) or "—"
+            mover_txt=f"Tăng: {up}; Giảm: {dn}"
+        lines.append(f"**{y}** · CR3 **{_pct(cr3)}**, CR5 **{_pct(cr5)}**. {mover_txt}")
+    _write_block(f"Tổng hợp – {title}", lines)
+    _write_block("Hàm ý vận hành", [
+        "Ưu tiên **SKU/khách trụ cột** (CR3/CR5) để hấp thụ công suất; thiết kế **MOQ/lot size** cho đuôi dài.",
+        "Thiết lập **khóa lịch BOM** cho mẫu mới trước T‑6~8 tuần để tránh dồn set‑up."
+    ])
 
+# ==== 5) Pareto 80/20 ====
 def explain_pareto(df, by_col):
     if df.empty: return
-    s = df.groupby(by_col)['sl'].sum().sort_values(ascending=False)
-    cum_share = (s.cumsum()/s.sum()).values
-    n80 = int(np.searchsorted(cum_share, 0.8) + 1)
-    st.markdown(f"**📌 Diễn giải:** Cần ~**{n80}** {('khách hàng' if by_col=='khach_hang' else 'SKU')} để đạt **80%** tổng sản lượng.")
+    s=df.groupby(by_col)['sl'].sum().sort_values(ascending=False)
+    total=s.sum()
+    cum=(s.cumsum()/total) if total else s
+    n80=int(np.searchsorted(cum.values,0.8)+1) if total else 0
+    top5=s.head(5).sum()/total if total else 0
+    _write_block("Phân bổ & tập trung (80/20)", [
+        f"Cần ~**{n80}** {('khách hàng' if by_col=='khach_hang' else 'SKU')} để đạt **80%** tổng sản lượng.",
+        f"Top 5 chiếm **{_pct(top5)}** → cân bằng giữa **độ tập trung** và **linh hoạt vận hành**."
+    ])
 
+# ==== 6) Khu vực 100% theo năm ====
 def explain_region_100(reg_df):
     if reg_df.empty: return
-    reg_df = reg_df.copy()
-    reg_df['share'] = reg_df['sl']/reg_df.groupby('year')['sl'].transform('sum')
-    lines = []
-    for y, g in reg_df.groupby('year'):
-        tri = "; ".join([f"{r['khu_vuc']} {r['share']*100:.1f}%" for _,r in g.sort_values('share', ascending=False).iterrows()])
-        lines.append(f"**{y}:** {tri}")
-    st.markdown("**📌 Diễn giải:** " + " • ".join(lines))
+    d=reg_df.copy(); d['share']=d['sl']/d.groupby('year')['sl'].transform('sum')
+    lines=[]
+    for y,g in d.groupby('year'):
+        g=g.sort_values('share', ascending=False)
+        tri="; ".join([f"{r['khu_vuc']} {_pct(r['share'])}" for _,r in g.iterrows()])
+        lines.append(f"**{y}**: {tri}")
+    _write_block("Cơ cấu theo khu vực (100%)", lines)
 
+    # dịch chuyển chính theo năm
+    moves=[]
+    for y in sorted(d['year'].unique()):
+        if (y-1) in d['year'].unique():
+            p=d[d['year']==y-1].set_index('khu_vuc')['share']
+            c=d[d['year']==y].set_index('khu_vuc')['share']
+            allr=sorted(set(p.index)|set(c.index))
+            diff=pd.Series({r:c.get(r,0)-p.get(r,0) for r in allr}).sort_values(ascending=False)
+            inc=", ".join([f"{r} (+{_pct(v)})" for r,v in diff.head(1).items() if v>0]) or "—"
+            dec=", ".join([f"{r} ({_pct(v)})" for r,v in diff.tail(1).items() if v<0]) or "—"
+            moves.append(f"**{y-1}→{y}**: tăng {inc}; giảm {dec}.")
+    if moves: _write_block("Chuyển dịch thị trường", moves)
+
+    _write_block("Action cho thị trường xuất khẩu", [
+        "Khoanh **khung năng lực** theo thị trường chủ lực; chuẩn hóa **combo màu–hardware** cho mùa cao điểm.",
+        "Với thị trường phụ, triển khai **stagger launch** (dàn đều SKU mới theo quý) để tránh dồn lực."
+    ])
+
+# ==== 7) Biến động & Dự đoán ====
 def explain_anomaly_forecast(tr_df):
     if tr_df.empty: return
-    s = tr_df.set_index('ym')['sl'].sort_index()
-    last_v = s.iloc[-1]
-    last_3 = s.tail(3).mean()
-    st.markdown(
-        f"**📌 Diễn giải:** Tháng gần nhất **{_fmt(last_v)}**; "
-        f"b/q 3 tháng gần nhất **{_fmt(int(last_3))}**. "
-        "Dự đoán dùng EWMA (đường đứt) & trung bình 3 tháng (dấu chấm)."
-    )
-
-def apply_filters(base: pd.DataFrame):
-    with st.sidebar:
-        # Logo ở Sidebar
-        try:
-            st.image("mocphat_logo.png", use_column_width=True)
-        except Exception:
-            pass
-
-        st.header("Bộ lọc")
-
-        with st.expander("Thời gian & tuỳ chọn chung", expanded=True):
-            years = sorted(base['year'].unique())
-            year_sel = st.multiselect("Năm", options=years, default=years, key="flt_years")
-            show_explain = st.toggle("🛈 Hiển thị giải thích trên biểu đồ", value=True)
-            animate_on   = st.toggle("🎞️ Bật hiệu ứng động (animation)", value=True)
-
-        with st.expander("Khách hàng", expanded=False):
-            cust_all = sorted(base['khach_hang'].dropna().unique().tolist())
-            default_cust = st.session_state.get("flt_cust_default", cust_all)
-            cust_sel = st.multiselect("Chọn khách hàng", options=cust_all, default=default_cust, key="flt_customers")
-            c1, c2 = st.columns(2)
-            with c1:
-                if st.button("Chọn tất cả KH"):
-                    st.session_state["flt_customers"] = cust_all
-                    st.session_state["flt_cust_default"] = cust_all
-                    st.rerun()
-            with c2:
-                if st.button("Bỏ chọn KH"):
-                    st.session_state["flt_customers"] = []
-                    st.session_state["flt_cust_default"] = []
-                    st.rerun()
-
-        with st.expander("Khu vực & Nhóm màu", expanded=False):
-            reg_sel   = st.multiselect("Khu vực", options=sorted(base['khu_vuc'].unique()),
-                                       default=list(base['khu_vuc'].unique()), key="flt_regions")
-            color_sel = st.multiselect("Nhóm màu", options=sorted(base['nhom_mau'].unique()),
-                                       default=list(base['nhom_mau'].unique()), key="flt_colors")
-
-        with st.expander("Tìm kiếm sản phẩm & tuỳ chọn khác", expanded=False):
-            sku_query = st.text_input("Tìm theo mã sản phẩm (ví dụ: MP, MT001, BRN)", key="flt_sku")
-            usb_only  = st.checkbox("Chỉ sản phẩm có cổng sạc (USB)", value=False, key="flt_usb")
-            if st.button("🔄 Xoá toàn bộ lọc"):
-                for k in ["flt_years","flt_customers","flt_regions","flt_colors","flt_sku","flt_usb","flt_cust_default"]:
-                    if k in st.session_state: del st.session_state[k]
-                st.rerun()
-
-    f = base[base['year'].isin(year_sel)]
-    if cust_sel:  f = f[f['khach_hang'].isin(cust_sel)]
-    if reg_sel:   f = f[f['khu_vuc'].isin(reg_sel)]
-    if color_sel: f = f[f['nhom_mau'].isin(color_sel)]
-    if sku_query:
-        q = sku_query.strip().upper()
-        f = f[f['ma_hang'].fillna('').str.upper().str.contains(q, na=False)]
-    if usb_only:  f = f[f['usb_flag']]
-    return f, show_explain, animate_on
-
-def excel_download(df: pd.DataFrame) -> bytes:
-    output = BytesIO()
-    with pd.ExcelWriter(output, engine='openpyxl') as writer:
-        df.to_excel(writer, index=False, sheet_name='DATA')
-        df.groupby('year')['sl'].sum().reset_index().to_excel(writer, index=False, sheet_name='TONG_NAM')
-        df.groupby(['year','nhom_mau'])['sl'].sum().reset_index().to_excel(writer, index=False, sheet_name='MAU_NAM')
-        df.groupby(['year','khach_hang'])['sl'].sum().reset_index().to_excel(writer, index=False, sheet_name='KHACH_NAM')
-        df.groupby(['year','ma_hang'])['sl'].sum().reset_index().to_excel(writer, index=False, sheet_name='SKU_NAM')
-    return output.getvalue()
-
-def add_kpi_cards(df: pd.DataFrame):
-    by_year = df.groupby('year')['sl'].sum().sort_index()
-    t23, t24, t25 = [by_year.get(y, 0) for y in [2023, 2024, 2025]]
-    yoy24 = (t24 - t23)/t23*100 if t23 else np.nan
-    yoy25 = (t25 - t24)/t24*100 if t24 else np.nan
-
-    last_ym = df['ym'].max() if not df.empty else None
-    ytd, pytd, ytd_g = 0, 0, np.nan
-    if last_ym is not None:
-        y, m = last_ym.year, last_ym.month
-        ytd  = df[(df['year']==y)   & (df['month']<=m)]['sl'].sum()
-        pytd = df[(df['year']==y-1) & (df['month']<=m)]['sl'].sum()
-        ytd_g = (ytd - pytd)/pytd*100 if pytd else np.nan
-
-    c1,c2,c3,c4 = st.columns(4)
-    with c1:
-        st.markdown('<div class="kpi-card">', unsafe_allow_html=True)
-        st.metric("Tổng sản lượng 2023", f"{int(t23):,}")
-        st.markdown('</div>', unsafe_allow_html=True)
-    with c2:
-        st.markdown('<div class="kpi-card">', unsafe_allow_html=True)
-        st.metric("Tổng sản lượng 2024", f"{int(t24):,}", f"{yoy24:+.1f}% so với 2023" if not np.isnan(yoy24) else None)
-        st.markdown('</div>', unsafe_allow_html=True)
-    with c3:
-        st.markdown('<div class="kpi-card">', unsafe_allow_html=True)
-        st.metric("Tổng sản lượng 2025", f"{int(t25):,}", f"{yoy25:+.1f}% so với 2024" if not np.isnan(yoy25) else None)
-        st.markdown('</div>', unsafe_allow_html=True)
-    with c4:
-        st.markdown('<div class="kpi-card">', unsafe_allow_html=True)
-        st.metric("Lũy kế đến tháng gần nhất vs cùng kỳ", f"{int(ytd):,}", f"{ytd_g:+.1f}%")
-        st.markdown('</div>', unsafe_allow_html=True)
-
-def anomaly_and_forecast(tr: pd.DataFrame, title_suffix: str=""):
-    if tr.empty:
-        return None, None
-    s = tr.set_index('ym')['sl'].sort_index()
-    roll = s.rolling(3, min_periods=2)
-    mean = roll.mean(); std = roll.std().fillna(0)
-    z = (s - mean)/std.replace(0, np.nan)
-    anomalies = z.abs() > 2
-
-    fig1 = go.Figure()
-    fig1.add_trace(go.Scatter(x=s.index, y=s.values, mode='lines+markers', name='Sản lượng'))
-    fig1.add_trace(go.Scatter(x=s.index[anomalies], y=s[anomalies], mode='markers',
-                              name='Bất thường', marker=dict(color=ACCENT, size=10)))
-    fig1.update_layout(template=PLOT_TEMPLATE, title=f"Điểm bất thường (±2σ){' – ' + title_suffix if title_suffix else ''}",
-                       xaxis_title="Thời gian (tháng)", yaxis_title="Sản lượng")
-
-    span = 3
-    ewma = s.ewm(span=span, adjust=False).mean()
-    last3 = s.tail(3).mean() if len(s) >= 3 else s.mean()
-    future_x = pd.date_range(s.index.max() + pd.offsets.MonthBegin(1), periods=3, freq='MS')
-    f_ewma  = [ewma.iloc[-1]]*3
-    f_naive = [last3]*3
-
-    fig2 = go.Figure()
-    fig2.add_trace(go.Scatter(x=s.index, y=s.values, mode='lines', name='Lịch sử'))
-    fig2.add_trace(go.Scatter(x=s.index, y=ewma.values, mode='lines', name=f"Đường mượt (EWMA {span})"))
-    fig2.add_trace(go.Scatter(x=future_x, y=f_ewma, mode='lines+markers', name='Dự đoán (EWMA)', line=dict(dash='dash')))
-    fig2.add_trace(go.Scatter(x=future_x, y=f_naive, mode='lines+markers', name='Dự đoán (TB 3 tháng)', line=dict(dash='dot')))
-    fig2.update_layout(template=PLOT_TEMPLATE, title=f"Dự đoán 3 tháng{' – ' + title_suffix if title_suffix else ''}",
-                       xaxis_title="Thời gian (tháng)", yaxis_title="Sản lượng")
-    return fig1, fig2
-
-def pareto_share(df: pd.DataFrame, by_col: str='khach_hang'):
-    if df.empty:
-        return pd.DataFrame()
-    s = df.groupby(by_col)['sl'].sum().sort_values(ascending=False).reset_index()
-    s['cum_units'] = s['sl'].cumsum()
-    total = s['sl'].sum()
-    s['cum_share'] = s['cum_units']/total if total else 0
-    return s
+    s=tr_df.set_index('ym')['sl'].sort_index()
+    roll=s.rolling(3, min_periods=2); mean=roll.mean(); std=roll.std().fillna(0)
+    z=(s-mean)/std.replace(0, np.nan); n_ano=int((z.abs()>2).sum())
+    last_v=s.iloc[-1]; last_3=s.tail(3).mean()
+    _write_block("Đọc nhanh & hành động", [
+        f"Điểm bất thường (±2σ): **{n_ano}** kỳ; tháng gần nhất **{_fmt(last_v)}**, b/q 3 tháng **{_fmt(int(last_3))}**.",
+        "Nếu bất thường tăng → ưu tiên **SKU/khách chủ lực**; bất thường giảm → rà lại **định mức vật tư** & **điều độ**.",
+        "Dự báo ngắn hạn (EWMA, TB 3 tháng) dùng cho **kế hoạch 4–8 tuần** (vật tư, nhân lực, sơn)."
+    ])
 
 # ========= HEADER STICKY (logo + tiêu đề lớn + tagline mới) =========
 def _logo_base64(path="mocphat_logo.png"):
