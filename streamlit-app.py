@@ -1,10 +1,10 @@
 
 # app.py
-# Báo cáo kinh doanh Mộc Phát Furniture (2023–2025)
-# Phân tích toàn bộ dữ liệu (kể cả ECOM), brand xanh Mộc Phát, logo, bộ lọc mượt, animation, hover giải thích chi tiết
-# Tab Khu vực (100% theo năm + Small multiples + Quý + Slope), Tab Insight (Mùa–Màu–Vùng, SKU Health, cảnh báo)
+# Báo cáo kinh doanh Mộc Phát Furniture – bản brand xanh, logo sticky, diễn giải sau biểu đồ
+# Phân tích toàn bộ dữ liệu (kể cả ECOM), bộ lọc mượt, animation, hover chi tiết, Insight & Khu vực cải tiến
 
 import os
+import base64
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -16,12 +16,12 @@ from datetime import datetime
 # ========= THIẾT LẬP GIAO DIỆN / BRAND =========
 st.set_page_config(page_title="Báo cáo kinh doanh Mộc Phát Furniture", layout="wide")
 
-# Xanh chủ đạo Mộc Phát (Dartmouth green) + sắc độ đồng hành
-PRIMARY = "#066839"   # màu thương hiệu
+# Màu thương hiệu (Dartmouth green) + dải màu đồng hành
+PRIMARY = "#066839"   # xanh thương hiệu
 ACCENT  = "#1B7D4F"   # xanh đậm để nhấn
 BRAND_COLORWAY = ["#066839", "#1B7D4F", "#0F5132", "#18392B", "#212224"]
 
-# Bảng màu đúng "màu sơn" (không bị ảnh hưởng bởi brand khi đã set color_discrete_map)
+# Bảng màu "đúng màu sơn" (không dùng brand palette)
 COLOR_PALETTE = {
     "BROWN":   "#8B5A2B",
     "WHITE":   "#F2F2F2",
@@ -49,24 +49,28 @@ CUSTOM_CSS = f"""
   --brand-2: {ACCENT};
 }}
 html {{ scroll-behavior: smooth; }}
-/* Chữ in đậm, dễ đọc */
+
+/* Chữ đậm, dễ đọc */
 h1, h2, h3, h4 {{ font-weight: 800 !important; }}
-section p, .stMarkdown p, .stCaption, .st-emotion-cache-10trblm, .st-emotion-cache-1kyxreq {{
+section p, .stMarkdown p, .stCaption {{
   font-weight: 600 !important;
 }}
-/* KPI card trẻ trung */
+
+/* KPI card */
 .kpi-card {{
   padding: 14px 16px;
   border-radius: 12px;
   border: 1px solid rgba(0,0,0,0.06);
   background: linear-gradient(180deg, rgba(6,104,57,0.08), rgba(6,104,57,0.02));
 }}
-/* Sidebar tone nhẹ + logo */
+
+/* Sidebar tone nhẹ */
 [data-testid="stSidebar"] {{
-  background: linear-gradient(180deg, rgba(6,104,57,0.08), rgba(6,104,57,0.0));
+  background: linear-gradient(180deg, rgba(6,104,57,0.08), rgba(6,104,57,0));
   border-right: 1px solid rgba(0,0,0,0.05);
 }}
-/* Nút, slider, checkbox, radio theo brand */
+
+/* Nút/slider/radio theo brand */
 .stButton>button, .stDownloadButton>button {{
   background: var(--brand) !important; border: none !important; color: #fff !important;
   font-weight: 700 !important; border-radius: 10px !important;
@@ -74,12 +78,26 @@ section p, .stMarkdown p, .stCaption, .st-emotion-cache-10trblm, .st-emotion-cac
 .stButton>button:hover, .stDownloadButton>button:hover {{ filter: brightness(0.95); }}
 .stSlider [role='slider'] {{ border: 2px solid var(--brand) !important; }}
 .stSlider .st-dq {{ background: var(--brand) !important; }}
-.stCheckbox [data-baseweb='checkbox'] div {{ border-color: var(--brand) !important; }}
 .stRadio [role='radiogroup'] label span {{ font-weight: 700 !important; }}
-/* Plotly container bo góc nhẹ */
+
+/* Plotly container bo góc */
 .js-plotly-plot {{ border-radius: 10px; }}
+
 /* Bảng DataFrame tiêu đề đậm */
 .stDataFrame thead tr th {{ font-weight: 800 !important; }}
+
+/* Header sticky */
+.header-sticky {{
+  position: sticky; top: 0; z-index: 9999;
+  backdrop-filter: blur(6px);
+  background: {"#FFFFFF" if PLOT_TEMPLATE=="plotly_white" else "#0E1117"}E6;
+  border-bottom: 1px solid rgba(0,0,0,0.08);
+  padding: 8px 6px 6px 6px;
+}}
+.header-wrap {{ display:flex; align-items:center; gap:12px; }}
+.header-logo {{ height: 40px; border-radius: 6px; }}
+.header-title {{ font-size: 34px; font-weight: 900; line-height: 1.05; margin: 0; }}
+.header-tagline {{ color: {PRIMARY}; font-weight: 800; margin-top: 2px; }}
 </style>
 """
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
@@ -165,6 +183,85 @@ def add_play_controls(fig, frame_ms=700, transition_ms=300):
         )]
     )
     return fig
+
+# ====== TIỆN ÍCH DIỄN GIẢI ======
+def _fmt(n):
+    try: return f"{int(n):,}"
+    except: return f"{n:,}"
+
+def explain_trend_monthly(df):
+    if df.empty: return
+    s = df.groupby('ym')['sl'].sum().sort_index()
+    if s.empty: return
+    peak_m, peak_v = s.idxmax(), s.max()
+    low_m,  low_v  = s.idxmin(), s.min()
+    last3 = s.tail(3).sum(); prev3 = s.tail(6).head(3).sum()
+    delta3 = None if prev3==0 else (last3-prev3)/prev3*100
+    st.markdown(
+        f"**📌 Diễn giải:** Tháng cao nhất **{peak_m:%Y-%m}** đạt **{_fmt(peak_v)}**; "
+        f"tháng thấp nhất **{low_m:%Y-%m}** **{_fmt(low_v)}**. "
+        + (f"3 tháng gần nhất **{_fmt(last3)}** so với 3 tháng trước **{_fmt(prev3)}** "
+           f"→ _{'tăng' if delta3 and delta3>0 else 'giảm' if delta3 and delta3<0 else 'ổn định'} "
+           f"{'' if delta3 is None else f'{delta3:+.1f}%'}_.")
+    )
+
+def explain_color_100(col_df):
+    if col_df.empty: return
+    x = col_df.groupby(['year','nhom_mau'])['sl'].sum().reset_index()
+    x['share'] = x['sl']/x.groupby('year')['sl'].transform('sum')
+    txt = []
+    for y, g in x.groupby('year'):
+        g = g.sort_values('share', ascending=False).head(3)
+        tri = ", ".join([f"{r['nhom_mau'].title()} {_fmt(round(r['share']*100,1))}%" for _,r in g.iterrows()])
+        txt.append(f"**{y}:** Top màu {tri}.")
+    st.markdown("**📌 Diễn giải:** " + " ".join(txt))
+
+def explain_usb_share(df):
+    y = sorted(df['year'].unique())
+    if not y: return
+    shares = {yy: df[df['year']==yy]['usb_flag'].mean() for yy in y}
+    ytxt = " • ".join([f"**{yy}**: {shares[yy]*100:.1f}%" for yy in y])
+    st.markdown(f"**📌 Diễn giải:** Tỷ lệ sản phẩm có cổng sạc (USB) — {ytxt}.")
+
+def explain_top_list(df, by_col, title):
+    if df.empty: return
+    df = df.copy()
+    df['year_total'] = df.groupby('year')['sl'].transform('sum')
+    df['share'] = df['sl']/df['year_total']
+    parts = []
+    for y, g in df.groupby('year'):
+        g = g.sort_values('sl', ascending=False).head(3)
+        tri = "; ".join([f"{r[by_col]} ({_fmt(r['sl'])} – {r['share']*100:.1f}%)" for _,r in g.iterrows()])
+        parts.append(f"**{y}:** {tri}")
+    st.markdown(f"**📌 Diễn giải – {title}:** " + " • ".join(parts))
+
+def explain_pareto(df, by_col):
+    if df.empty: return
+    s = df.groupby(by_col)['sl'].sum().sort_values(ascending=False)
+    cum_share = (s.cumsum()/s.sum()).values
+    n80 = int(np.searchsorted(cum_share, 0.8) + 1)
+    st.markdown(f"**📌 Diễn giải:** Cần ~**{n80}** {('khách hàng' if by_col=='khach_hang' else 'SKU')} để đạt **80%** tổng sản lượng.")
+
+def explain_region_100(reg_df):
+    if reg_df.empty: return
+    reg_df = reg_df.copy()
+    reg_df['share'] = reg_df['sl']/reg_df.groupby('year')['sl'].transform('sum')
+    lines = []
+    for y, g in reg_df.groupby('year'):
+        tri = "; ".join([f"{r['khu_vuc']} {r['share']*100:.1f}%" for _,r in g.sort_values('share', ascending=False).iterrows()])
+        lines.append(f"**{y}:** {tri}")
+    st.markdown("**📌 Diễn giải:** " + " • ".join(lines))
+
+def explain_anomaly_forecast(tr_df):
+    if tr_df.empty: return
+    s = tr_df.set_index('ym')['sl'].sort_index()
+    last_v = s.iloc[-1]
+    last_3 = s.tail(3).mean()
+    st.markdown(
+        f"**📌 Diễn giải:** Tháng gần nhất **{_fmt(last_v)}**; "
+        f"b/q 3 tháng gần nhất **{_fmt(int(last_3))}**. "
+        "Dự đoán dùng EWMA (đường đứt) & trung bình 3 tháng (dấu chấm)."
+    )
 
 def apply_filters(base: pd.DataFrame):
     with st.sidebar:
@@ -305,25 +402,36 @@ def pareto_share(df: pd.DataFrame, by_col: str='khach_hang'):
     s['cum_share'] = s['cum_units']/total if total else 0
     return s
 
-# ========= NẠP DỮ LIỆU + HEADER =========
-# Header với logo + tiêu đề
-c_logo, c_title = st.columns([1, 6])
-with c_logo:
+# ========= HEADER STICKY (logo + tiêu đề lớn + tagline mới) =========
+def _logo_base64(path="mocphat_logo.png"):
     try:
-        st.image("mocphat_logo.png", width=64)
+        with open(path, "rb") as f:
+            return base64.b64encode(f.read()).decode("utf-8")
     except Exception:
-        st.markdown(f"<div style='width:64px;height:64px;border-radius:10px;background:{PRIMARY};'></div>", unsafe_allow_html=True)
-with c_title:
-    st.markdown(
-        f"""
-        <div style="margin-top:4px;">
-          <div style="font-size:28px; font-weight:800; line-height:1.1;">Báo cáo kinh doanh Mộc Phát Furniture</div>
-          <div style="color:{PRIMARY}; font-weight:800; margin-top:4px;">Xuất khẩu đồ gỗ • 2023–2025</div>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
+        return None
 
+_logo64 = _logo_base64("mocphat_logo.png")
+if _logo64:
+    _img_tag = f"<img class='header-logo' src='data:image/png;base64,{_logo64}'/>"
+else:
+    _img_tag = f"<div class='header-logo' style='width:40px;height:40px;background:{PRIMARY};'></div>"
+
+st.markdown(
+    f"""
+    <div class="header-sticky">
+      <div class="header-wrap">
+        {_img_tag}
+        <div>
+          <div class="header-title">Báo cáo kinh doanh Mộc Phát Furniture</div>
+          <div class="header-tagline">Xuất khẩu đồ gỗ nội thất</div>
+        </div>
+      </div>
+    </div>
+    """,
+    unsafe_allow_html=True
+)
+
+# ========= NẠP DỮ LIỆU =========
 st.caption("Tải file Excel/CSV của bạn hoặc dùng sẵn tệp mặc định nếu có trong thư mục.")
 
 with st.sidebar:
@@ -364,6 +472,7 @@ with T1:
         if show_explain:
             fig.update_traces(hovertemplate="Tháng: %{x|%Y-%m}<br>Sản lượng: %{y:,}<extra></extra>")
         st.plotly_chart(fig, use_container_width=True, key="t1_trend")
+        explain_trend_monthly(f)
 
     c1, c2 = st.columns(2)
     with c1:
@@ -383,6 +492,7 @@ with T1:
             if show_explain:
                 fig.update_traces(hovertemplate="Năm: %{x}<br>Màu: %{legendgroup}<br>Tỷ trọng: %{y:.1%}<extra></extra>")
             st.plotly_chart(fig, use_container_width=True, key="t1_colormix")
+            explain_color_100(color_tot)
 
     with c2:
         st.markdown("**Tỷ lệ sản phẩm có cổng sạc (USB) theo năm**")
@@ -394,11 +504,12 @@ with T1:
         if show_explain:
             fig.update_traces(hovertemplate="Năm: %{x}<br>% USB: %{y:.1%}<extra></extra>")
         st.plotly_chart(fig, use_container_width=True, key="t1_usbshare")
+        explain_usb_share(f)
 
 # --- TAB 2: Khách hàng ---
 with T2:
     st.subheader("Khách hàng")
-    # Bar-race theo tháng (Top 10)
+    # Bar‑race theo tháng (Top 10)
     if animate_on:
         topn = 10
         by_m = f.groupby(['ym','khach_hang'])['sl'].sum().reset_index()
@@ -420,8 +531,6 @@ with T2:
             )
             fig.update_layout(xaxis_title="Sản lượng", yaxis_title="Khách hàng")
             fig = add_play_controls(fig, frame_ms=700, transition_ms=300)
-            if show_explain:
-                st.caption("Bar‑race cho thấy khách nào dẫn đầu từng tháng; di chuột để xem sản lượng, tỷ trọng và thứ hạng.")
             st.plotly_chart(fig, use_container_width=True, key="t2_bar_race_month")
 
     # Top KH theo năm
@@ -444,6 +553,7 @@ with T2:
                 customdata=np.stack([t['share'], t['label'], t['rank']], axis=-1)
             )
             cols[i % 2].plotly_chart(fig, use_container_width=True, key=f"t2_topcust_{y}")
+        explain_top_list(cust_year, by_col='khach_hang', title='Khách hàng dẫn dắt')
 
     st.markdown("---")
     st.subheader("Quy tắc 80/20 theo khách hàng")
@@ -455,11 +565,12 @@ with T2:
         fig.update_yaxes(tickformat=',.0%'); fig.update_xaxes(title="Số khách hàng theo thứ hạng")
         fig.update_traces(hovertemplate="Xếp hạng KH: %{x}<br>Tích luỹ tỷ trọng: %{y:.1%}<extra></extra>")
         st.plotly_chart(fig, use_container_width=True, key="t2_pareto_cust")
+        explain_pareto(f, by_col='khach_hang')
 
 # --- TAB 3: Sản phẩm (SKU) ---
 with T3:
     st.subheader("Sản phẩm (SKU)")
-    # Bar-race SKU theo tháng
+    # Bar‑race SKU theo tháng
     if animate_on:
         topn = 15
         by_m_sku = f.groupby(['ym','ma_hang'])['sl'].sum().reset_index()
@@ -481,8 +592,6 @@ with T3:
             )
             fig.update_layout(xaxis_title="Sản lượng", yaxis_title="SKU")
             fig = add_play_controls(fig, frame_ms=700, transition_ms=300)
-            if show_explain:
-                st.caption("Bar‑race giúp xem SKU nào nổi bật theo từng tháng (sản lượng, % và thứ hạng).")
             st.plotly_chart(fig, use_container_width=True, key="t3_bar_race_month")
 
     # Top SKU theo năm
@@ -505,6 +614,7 @@ with T3:
                 customdata=np.stack([s['share'], s['label'], s['rank']], axis=-1)
             )
             cols[i % 2].plotly_chart(fig, use_container_width=True, key=f"t3_topsku_{y}")
+        explain_top_list(sku_year, by_col='ma_hang', title='SKU dẫn dắt')
 
     st.markdown("---")
     st.subheader("Quy tắc 80/20 theo SKU")
@@ -516,6 +626,7 @@ with T3:
         fig.update_yaxes(tickformat=',.0%'); fig.update_xaxes(title="Số SKU theo thứ hạng")
         fig.update_traces(hovertemplate="Xếp hạng SKU: %{x}<br>Tích luỹ tỷ trọng: %{y:.1%}<extra></extra>")
         st.plotly_chart(fig, use_container_width=True, key="t3_pareto_sku")
+        explain_pareto(f, by_col='ma_hang')
 
 # --- TAB 4: Màu & Tay nắm ---
 with T4:
@@ -529,6 +640,7 @@ with T4:
         fig.update_yaxes(tickformat=',.0%'); fig.update_layout(legend_title_text="Màu", xaxis_title="Năm", yaxis_title="Tỷ trọng")
         fig.update_traces(hovertemplate="Năm: %{x}<br>Màu: %{legendgroup}<br>Tỷ trọng: %{y:.1%}<extra></extra>")
         st.plotly_chart(fig, use_container_width=True, key="t4_colormix")
+        explain_color_100(col_tot)
 
     st.markdown("---")
     st.subheader("Xu hướng sản lượng theo tháng – theo màu")
@@ -569,9 +681,8 @@ with T5:
             fig.update_yaxes(tickformat=',.0%', title="Tỷ trọng"); fig.update_xaxes(title="Năm")
             fig.update_layout(legend_title_text="Khu vực")
             fig.update_traces(hovertemplate="Năm: %{x}<br>Khu vực: %{legendgroup}<br>Tỷ trọng: %{y:.1%}<extra></extra>")
-            if show_explain:
-                st.caption("Mỗi cột = 100% sản lượng của năm đó; phần màu là tỷ trọng từng khu vực. Bắc Mỹ chiếm đa số và tăng mạnh trong 2025.")
             st.plotly_chart(fig, use_container_width=True, key="t5_bar_100")
+            explain_region_100(reg)
 
         elif view == "Small multiples theo khu vực":
             m_reg = f.groupby(['ym','khu_vuc'])['sl'].sum().reset_index()
@@ -616,9 +727,9 @@ with T6:
         if show_explain:
             fig_a.update_traces(hovertemplate="Tháng: %{x|%Y-%m}<br>Sản lượng: %{y:,}<extra></extra>")
             fig_f.update_traces(hovertemplate="Thời điểm: %{x|%Y-%m}<br>Giá trị: %{y:,}<extra></extra>")
-            st.caption("Trái: điểm bất thường; Phải: dự đoán 3 tháng tới (đường đứt/dấu chấm).")
         st.plotly_chart(fig_a, use_container_width=True, key="t6_anomaly")
         st.plotly_chart(fig_f, use_container_width=True, key="t6_forecast")
+        explain_anomaly_forecast(tr_all)
 
 # --- TAB 7: Insight (Gợi ý vận hành) ---
 with T7:
@@ -638,8 +749,7 @@ with T7:
         fig = px.imshow(heat, color_continuous_scale='YlGnBu', aspect='auto', origin='lower')
         fig.update_coloraxes(colorbar_title='Tỷ trọng')
         st.plotly_chart(fig, use_container_width=True, key="t7_season_color_heat")
-        if show_explain:
-            st.caption("Heatmap cho biết **màu nào trội theo mùa** ở thị trường đã chọn.")
+        st.caption("Heatmap cho biết **màu nào trội theo mùa** ở thị trường đã chọn (dựa dữ liệu đang lọc).")
 
     st.markdown("---")
 
