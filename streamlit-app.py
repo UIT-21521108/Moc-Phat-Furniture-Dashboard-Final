@@ -452,29 +452,69 @@ def add_kpi_cards(df:pd.DataFrame):
         st.metric("Lũy kế đến tháng gần nhất vs cùng kỳ", f"{int(ytd):,}", f"{ytd_g:+.1f}%")
         st.markdown('</div>',unsafe_allow_html=True)
 
-def anomaly_and_forecast(tr:pd.DataFrame, title_suffix:str=""):
-    if tr.empty: return None,None
-    s=tr.set_index('ym')['sl'].sort_index()
-    roll=s.rolling(3,min_periods=2); mean=roll.mean(); std=roll.std().fillna(0)
-    z=(s-mean)/std.replace(0,np.nan); anomalies=z.abs()>2
-    fig1=go.Figure()
-    fig1.add_trace(go.Scatter(x=s.index,y=s.values,mode='lines+markers',name='Sản lượng'))
-    fig1.add_trace(go.Scatter(x=s.index[anomalies],y=s[anomalies],mode='markers',
-                              name='Bất thường',marker=dict(color=ACCENT,size=10)))
-    fig1.update_layout(template=PLOT_TEMPLATE,title=f"Điểm bất thường (±2σ){' – '+title_suffix if title_suffix else ''}",
-                       xaxis_title="Thời gian (tháng)",yaxis_title="Sản lượng")
-    span=3; ewma=s.ewm(span=span,adjust=False).mean()
-    last3=s.tail(3).mean() if len(s)>=3 else s.mean()
-    future_x=pd.date_range(s.index.max()+pd.offsets.MonthBegin(1),periods=3,freq='MS')
-    f_ewma=[ewma.iloc[-1]]*3; f_naive=[last3]*3
-    fig2=go.Figure()
-    fig2.add_trace(go.Scatter(x=s.index,y=s.values,mode='lines',name='Lịch sử'))
-    fig2.add_trace(go.Scatter(x=s.index,y=ewma.values,mode='lines',name=f"Đường mượt (EWMA {span})"))
-    fig2.add_trace(go.Scatter(x=future_x,y=f_ewma,mode='lines+markers',name='Dự đoán (EWMA)',line=dict(dash='dash')))
-    fig2.add_trace(go.Scatter(x=future_x,y=f_naive,mode='lines+markers',name='Dự đoán (TB 3 tháng)',line=dict(dash='dot')))
-    fig2.update_layout(template=PLOT_TEMPLATE,title=f"Dự đoán 3 tháng{' – '+title_suffix if title_suffix else ''}",
-                       xaxis_title="Thời gian (tháng)",yaxis_title="Sản lượng")
-    return fig1,fig2
+
+def anomaly_and_forecast(tr: pd.DataFrame, title_suffix: str=""):
+    """
+    Vẽ biểu đồ điểm bất thường (±2σ) và dự báo ngắn hạn 3 tháng (EWMA & TB 3 tháng).
+    Bản vá: đổi tên biến 'ewma' -> 'ewma_series' để tránh xung đột; gia cố dữ liệu trống/ít điểm.
+    """
+    # 1) Kiểm tra và chuẩn hoá dữ liệu
+    if tr is None or tr.empty or 'ym' not in tr.columns or 'sl' not in tr.columns:
+        return None, None
+    s = (tr.dropna(subset=['ym', 'sl'])
+           .set_index('ym')['sl']
+           .astype(float)
+           .sort_index())
+
+    if s.empty:
+        return None, None
+
+    # 2) Phát hiện bất thường với cửa sổ 3 tháng (min_periods=2 để không rỗng đầu chuỗi)
+    roll = s.rolling(3, min_periods=2)
+    mean = roll.mean()
+    std  = roll.std().replace(0, np.nan)  # tránh chia 0
+    z = (s - mean) / std
+    anomalies = z.abs() > 2
+
+    # 3) Biểu đồ bất thường
+    fig1 = go.Figure()
+    fig1.add_trace(go.Scatter(x=s.index, y=s.values, mode='lines+markers', name='Sản lượng'))
+    if anomalies.any():
+        fig1.add_trace(go.Scatter(x=s.index[anomalies], y=s[anomalies], mode='markers',
+                                  name='Bất thường', marker=dict(color=ACCENT, size=10)))
+    fig1.update_layout(
+        template=PLOT_TEMPLATE,
+        title=f"Điểm bất thường (±2σ){' – ' + title_suffix if title_suffix else ''}",
+        xaxis_title="Thời gian (tháng)",
+        yaxis_title="Sản lượng"
+    )
+
+    # 4) Dự báo ngắn hạn 3 tháng tới: EWMA & trung bình 3 tháng cuối
+    span = 3
+    ewma_series = s.ewm(span=span, adjust=False).mean()
+    last3 = s.tail(3).mean() if len(s) >= 3 else s.mean()
+
+    future_x = pd.date_range(s.index.max() + pd.offsets.MonthBegin(1), periods=3, freq='MS')
+    f_ewma  = [float(ewma_series.iloc[-1])] * len(future_x)
+    f_naive = [float(last3)] * len(future_x)
+
+    fig2 = go.Figure()
+    fig2.add_trace(go.Scatter(x=s.index, y=s.values, mode='lines', name='Lịch sử'))
+    fig2.add_trace(go.Scatter(x=s.index, y=ewma_series.values, mode='lines',
+                              name=f"Đường mượt (EWMA {span})"))
+    fig2.add_trace(go.Scatter(x=future_x, y=f_ewma,  mode='lines+markers',
+                              name='Dự đoán (EWMA)', line=dict(dash='dash')))
+    fig2.add_trace(go.Scatter(x=future_x, y=f_naive, mode='lines+markers',
+                              name='Dự đoán (TB 3 tháng)', line=dict(dash='dot')))
+    fig2.update_layout(
+        template=PLOT_TEMPLATE,
+        title=f"Dự đoán 3 tháng{' – ' + title_suffix if title_suffix else ''}",
+        xaxis_title="Thời gian (tháng)",
+        yaxis_title="Sản lượng"
+    )
+
+    return fig1, fig2
+
 
 def pareto_share(df:pd.DataFrame, by_col:str='khach_hang'):
     if df.empty: return pd.DataFrame()
