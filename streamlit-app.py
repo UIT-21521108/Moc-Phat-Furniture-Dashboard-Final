@@ -57,25 +57,21 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 2. LOAD DỮ LIỆU (TỰ ĐỘNG BẮT TÊN FILE DÀI)
+# 2. LOAD DỮ LIỆU TỪ EXCEL (.XLSX)
 # ==========================================
 @st.cache_data(ttl=3600)
 def load_data():
-    # Tên file chính xác như trong thư mục của bạn
-    MAIN_FILE = "Master_2023_2025_PRO_clean.xlsx - Master_3Y_Clean.csv"
+    # Tên file EXCEL chính xác
+    EXCEL_FILE = "Master_2023_2025_PRO_clean.xlsx"
     
     # Kiểm tra file tồn tại
-    if not os.path.exists(MAIN_FILE):
-        # Fallback: Nếu lỡ tên file bị đổi, thử tìm file csv nào nặng nhất trong thư mục
-        csv_files = [f for f in os.listdir('.') if f.endswith('.csv') and 'Master' in f]
-        if csv_files:
-            MAIN_FILE = csv_files[0] # Lấy file đầu tiên tìm thấy
-        else:
-            return None, f"⚠️ Không tìm thấy file: {MAIN_FILE}"
+    if not os.path.exists(EXCEL_FILE):
+        return None, f"⚠️ Không tìm thấy file: {EXCEL_FILE}. Hãy để file này cùng thư mục với app.py"
 
     try:
-        # Đọc file chính
-        df = pd.read_csv(MAIN_FILE)
+        # Đọc file Excel (Giả định dữ liệu nằm ở Sheet đầu tiên hoặc Sheet tên 'Master_3Y_Clean')
+        # Nếu muốn chỉ định sheet cụ thể, thêm tham số: sheet_name='Tên_Sheet'
+        df = pd.read_excel(EXCEL_FILE, engine='openpyxl')
         
         # 1. Chuẩn hóa tên cột
         df.columns = [str(c).strip().lower() for c in df.columns]
@@ -94,7 +90,7 @@ def load_data():
             
         df['sl'] = pd.to_numeric(df['sl'], errors='coerce').fillna(0)
         
-        # 4. Map Nhóm Màu (Nếu cột nhom_mau chưa có, dùng logic đơn giản)
+        # 4. Map Nhóm Màu (Nếu cột nhom_mau chưa có)
         if 'nhom_mau' not in df.columns:
             def map_color(c):
                 c = c.upper()
@@ -108,7 +104,7 @@ def load_data():
 
         return df, None
     except Exception as e:
-        return None, str(e)
+        return None, f"Lỗi đọc file Excel: {str(e)}"
 
 # Load Data
 df_raw, error = load_data()
@@ -122,7 +118,7 @@ if error:
 # ==========================================
 st.sidebar.markdown("### 🎯 BỘ LỌC")
 
-# Năm (Mặc định chọn hết)
+# Năm
 years = sorted(df_raw['year'].unique(), reverse=True)
 sel_years = st.sidebar.multiselect("Năm", years, default=years)
 
