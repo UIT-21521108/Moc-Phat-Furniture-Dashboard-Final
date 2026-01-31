@@ -9,7 +9,7 @@ from datetime import datetime
 from st_aggrid import AgGrid, GridOptionsBuilder
 
 # ==========================================
-# 1. CẤU HÌNH GIAO DIỆN (CYBER GLASS STABLE)
+# 1. CẤU HÌNH GIAO DIỆN (CYBER GLASS FINAL)
 # ==========================================
 st.set_page_config(page_title="Mộc Phát Analytics Pro", layout="wide", page_icon="🌲")
 
@@ -21,7 +21,7 @@ TEXT_MAIN = "#FAFAFA"
 TEXT_SUB = "#B0BEC5"
 GRID_COLOR = "rgba(255, 255, 255, 0.05)"
 
-# --- CSS VISUAL EFFECTS (Dùng .format() để tránh lỗi cú pháp) ---
+# --- CSS AN TOÀN (Dùng .format() để tránh lỗi cú pháp) ---
 css_style = """
 <style>
     /* 1. NỀN TECH GRID */
@@ -193,7 +193,7 @@ if sel_cust: df = df[df['khach_hang'].isin(sel_cust)]
 if df.empty: st.warning("Không có dữ liệu!"); st.stop()
 
 # ==========================================
-# 4. KPI CARDS
+# 4. KPI CARDS (HOLOGRAPHIC - FIXED)
 # ==========================================
 st.subheader("🚀 HIỆU QUẢ KINH DOANH")
 vol_by_year = df.groupby('year')['sl'].sum()
@@ -203,13 +203,18 @@ g24 = ((v24 - v23) / v23 * 100) if v23 > 0 else 0
 
 c1, c2, c3, c4 = st.columns(4)
 
+# HÀM KPI CARD ĐƯỢC SỬA LẠI ĐỂ KHÔNG GỌI HÀM BÊN NGOÀI GÂY LỖI
 def kpi_card(col, lbl, val, sub_val, sub_lbl):
+    # Định dạng số trực tiếp tại đây để tránh lỗi NameError
+    val_str = f"{val:,.0f}" 
+    
     color = NEON_GREEN if sub_val >= 0 else "#EF5350"
     icon = "▲" if sub_val >= 0 else "▼"
+    
     col.markdown(f"""
     <div class="kpi-card">
         <div class="kpi-lbl">{lbl}</div>
-        <div class="kpi-val">{fmt_num(val)}</div>
+        <div class="kpi-val">{val_str}</div>
         <div style="font-size:13px; font-weight:600; margin-top:8px; color:{color}">
             {icon} {abs(sub_val):.1f}% <span style="color:{TEXT_SUB}; font-weight:normal;">{sub_lbl}</span>
         </div>
@@ -248,6 +253,7 @@ with tab1:
         ts_data = df.groupby('ym')['sl'].sum().reset_index().sort_values('ym')
         
         fig = go.Figure()
+        # Area chart với gradient
         fig.add_trace(go.Scatter(x=ts_data['ym'], y=ts_data['sl'], mode='lines+markers', name='Thực tế', 
                                  line=dict(color=NEON_GREEN, width=3, shape='spline'),
                                  fill='tozeroy', fillcolor='rgba(0, 230, 118, 0.15)')) 
@@ -255,6 +261,7 @@ with tab1:
         ts_data['ma3'] = ts_data['sl'].rolling(window=3).mean()
         fig.add_trace(go.Scatter(x=ts_data['ym'], y=ts_data['ma3'], mode='lines', name='TB 3 tháng', line=dict(color='#FFA726', dash='dot')))
         
+        # Anomaly
         std = ts_data['sl'].rolling(window=3).std()
         upper = ts_data['ma3'] + (1.8 * std)
         anomalies = ts_data[ts_data['sl'] > upper]
@@ -270,13 +277,16 @@ with tab1:
             prev_m = ts_data.iloc[-2] if len(ts_data) > 1 else last_m
             mom = ((last_m['sl'] - prev_m['sl'])/prev_m['sl']*100) if prev_m['sl']>0 else 0
             
+            # Định dạng số trực tiếp trong chuỗi f-string
+            sl_fmt = f"{last_m['sl']:,.0f}"
+            
             st.markdown(f"""
             <div style="background:linear-gradient(135deg, rgba(0, 230, 118, 0.05), transparent); border-left:3px solid {NEON_GREEN}; padding:15px; border-radius:8px; border:1px solid rgba(255,255,255,0.05);">
                 <div style="color:{NEON_GREEN}; font-weight:bold; margin-bottom:8px">🤖 AI Quick Stats:</div>
                 <div style="font-size:14px; color:{TEXT_MAIN}; line-height:1.6">
-                • Tháng <b>{last_m['ym'].strftime('%m/%Y')}</b> đạt <b>{fmt_num(last_m['sl'])}</b> SP.<br>
+                • Tháng <b>{last_m['ym'].strftime('%m/%Y')}</b> đạt <b>{sl_fmt}</b> SP.<br>
                 • Tăng trưởng: <b style="color:{NEON_GREEN if mom>0 else '#EF5350'}">{mom:+.1f}%</b> so với tháng trước.<br>
-                • Phát hiện <b>{len(anomalies)}</b> điểm bất thường trong lịch sử.
+                • Phát hiện <b>{len(anomalies)}</b> điểm bất thường.
                 </div>
             </div>
             """, unsafe_allow_html=True)
@@ -294,13 +304,18 @@ with tab2:
         sl_2025_total = base_2025['sl'].sum()
         sl_2026_target = sl_2025_total * growth_factor
         
+        # Định dạng số
+        v25 = f"{sl_2025_total:,.0f}"
+        v26 = f"{sl_2026_target:,.0f}"
+        v_gap = f"{sl_2026_target - sl_2025_total:,.0f}"
+        
         with col_info:
             st.markdown(f"""
             <div style="background:rgba(255,167,38,0.1); border:1px solid #FFA726; padding:15px; border-radius:12px; display:flex; justify-content:space-around; align-items:center;">
-                <div style="text-align:center"><div style="font-size:12px; color:#aaa">2025 BASE</div><div style="font-size:24px; font-weight:bold">{fmt_num(sl_2025_total)}</div></div>
+                <div style="text-align:center"><div style="font-size:12px; color:#aaa">2025 BASE</div><div style="font-size:24px; font-weight:bold">{v25}</div></div>
                 <div style="font-size:20px; color:#FFA726">➔</div>
-                <div style="text-align:center"><div style="font-size:12px; color:#aaa">2026 TARGET</div><div style="font-size:24px; font-weight:bold; color:{NEON_GREEN}">{fmt_num(sl_2026_target)}</div></div>
-                <div style="text-align:center"><div style="font-size:12px; color:#aaa">GAP (+{growth_target}%)</div><div style="font-size:24px; font-weight:bold; color:#FFA726">+{fmt_num(sl_2026_target - sl_2025_total)}</div></div>
+                <div style="text-align:center"><div style="font-size:12px; color:#aaa">2026 TARGET</div><div style="font-size:24px; font-weight:bold; color:{NEON_GREEN}">{v26}</div></div>
+                <div style="text-align:center"><div style="font-size:12px; color:#aaa">GAP (+{growth_target}%)</div><div style="font-size:24px; font-weight:bold; color:#FFA726">+{v_gap}</div></div>
             </div>
             """, unsafe_allow_html=True)
             
