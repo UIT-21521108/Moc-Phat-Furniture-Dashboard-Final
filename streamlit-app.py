@@ -9,40 +9,34 @@ from datetime import datetime
 from st_aggrid import AgGrid, GridOptionsBuilder
 
 # ==========================================
-# 1. CẤU HÌNH GIAO DIỆN (CYBER GLASS EDITION)
+# 1. CẤU HÌNH GIAO DIỆN (CYBER GLASS STABLE)
 # ==========================================
 st.set_page_config(page_title="Mộc Phát Analytics Pro", layout="wide", page_icon="🌲")
 
-# BẢNG MÀU CAO CẤP
-PRIMARY = "#00C853"    # Xanh lá đậm hơn chút để dịu mắt
-NEON_GREEN = "#00E676" # Xanh Neon phát sáng (Accent)
-BG_DARK = "#050505"    # Nền đen sâu
+# BẢNG MÀU
+PRIMARY = "#00C853"    
+NEON_GREEN = "#00E676" 
+BG_DARK = "#050505"    
 TEXT_MAIN = "#FAFAFA"
 TEXT_SUB = "#B0BEC5"
-GRID_COLOR = "rgba(255, 255, 255, 0.05)" # Màu lưới mờ
+GRID_COLOR = "rgba(255, 255, 255, 0.05)"
 
-# --- CSS VISUAL EFFECTS (HIỆU ỨNG THỊ GIÁC) ---
-st.markdown(f"""
+# --- CSS VISUAL EFFECTS (Dùng .format() để tránh lỗi cú pháp) ---
+css_style = """
 <style>
-    /* 1. NỀN TECH GRID (LƯỚI CHẤM) */
+    /* 1. NỀN TECH GRID */
     .stApp {{
-        background-color: {BG_DARK};
+        background-color: {bg_dark};
         background-image: radial-gradient(#1A1A1A 1px, transparent 1px);
-        background-size: 20px 20px; /* Tạo họa tiết chấm bi công nghệ */
+        background-size: 20px 20px;
     }}
 
-    /* 2. CUSTOM SCROLLBAR (THANH CUỘN NEON) */
-    ::-webkit-scrollbar {{ width: 8px; height: 8px; }}
-    ::-webkit-scrollbar-track {{ background: #0a0a0a; }}
-    ::-webkit-scrollbar-thumb {{ background: {PRIMARY}; border-radius: 4px; }}
-    ::-webkit-scrollbar-thumb:hover {{ background: {NEON_GREEN}; }}
-
-    /* 3. HEADER GLASSMORPHISM (KÍNH MỜ) */
+    /* 2. HEADER GLASSMORPHISM */
     .header-sticky {{
         position: sticky; top: 0; z-index: 999;
-        background: rgba(10, 10, 10, 0.7); /* Trong suốt */
-        backdrop-filter: blur(15px);       /* Hiệu ứng mờ kính */
-        border-bottom: 1px solid rgba(0, 230, 118, 0.2); /* Viền sáng nhẹ */
+        background: rgba(10, 10, 10, 0.7);
+        backdrop-filter: blur(15px);
+        border-bottom: 1px solid rgba(0, 230, 118, 0.2);
         padding: 15px 25px; 
         margin-bottom: 25px;
         border-radius: 0 0 16px 16px;
@@ -50,60 +44,55 @@ st.markdown(f"""
         box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
     }}
 
-    /* 4. KPI CARDS (HOLOGRAPHIC STYLE) */
+    /* 3. KPI CARDS (HOLOGRAPHIC) */
     .kpi-card {{
-        background: rgba(25, 25, 25, 0.6); /* Nền bán trong suốt */
+        background: rgba(25, 25, 25, 0.6);
         backdrop-filter: blur(10px);
         border-radius: 16px;
         padding: 20px;
-        border: 1px solid rgba(255, 255, 255, 0.05); /* Viền siêu mỏng */
-        border-left: 4px solid {PRIMARY};
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        border-left: 4px solid {primary};
         box-shadow: 0 4px 6px rgba(0,0,0,0.2);
         transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        position: relative;
-        overflow: hidden;
     }}
-    /* Hiệu ứng Glow khi hover */
     .kpi-card:hover {{
         transform: translateY(-5px);
-        border-left-color: {NEON_GREEN};
+        border-left-color: {neon};
         box-shadow: 0 10px 40px -10px rgba(0, 230, 118, 0.3);
         border-top: 1px solid rgba(0, 230, 118, 0.2);
     }}
-    .kpi-lbl {{ font-size: 12px; color: {TEXT_SUB}; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px; }}
-    .kpi-val {{ font-size: 28px; font-weight: 800; color: {TEXT_MAIN}; text-shadow: 0 0 10px rgba(0,0,0,0.5); }}
-    
-    /* 5. TABS MODERN */
+    .kpi-lbl {{ font-size: 12px; color: {text_sub}; text-transform: uppercase; letter-spacing: 1px; }}
+    .kpi-val {{ font-size: 28px; font-weight: 800; color: {text_main}; }}
+
+    /* 4. TABS & AGGRID */
     .stTabs [data-baseweb="tab-list"] {{ gap: 8px; background: transparent; }}
     .stTabs [data-baseweb="tab"] {{ 
         background-color: rgba(255,255,255,0.03); 
-        color: {TEXT_SUB}; 
+        color: {text_sub}; 
         border-radius: 8px; 
-        border: 1px solid rgba(255,255,255,0.05);
-        padding: 8px 16px;
     }}
     .stTabs [aria-selected="true"] {{ 
-        background: linear-gradient(90deg, rgba(0, 200, 83, 0.2) 0%, rgba(0, 230, 118, 0.05) 100%);
-        border: 1px solid {PRIMARY};
-        color: {NEON_GREEN};
-        font-weight: bold;
+        border: 1px solid {primary};
+        color: {neon};
+        background: rgba(0, 200, 83, 0.1);
     }}
-
-    /* 6. INSIGHT BOX */
-    .insight-box {{
-        background: linear-gradient(135deg, rgba(0, 230, 118, 0.05), transparent);
-        border-left: 3px solid {NEON_GREEN};
-        padding: 15px; border-radius: 8px;
-        border-top: 1px solid rgba(255,255,255,0.05);
-        border-right: 1px solid rgba(255,255,255,0.05);
+    
+    /* AgGrid Dark Theme Fix */
+    .ag-theme-alpine-dark {{
+        --ag-background-color: #121212 !important;
+        --ag-header-background-color: #1A1A1A !important;
+        --ag-odd-row-background-color: #121212 !important;
+        --ag-foreground-color: {text_sub} !important;
+        --ag-border-color: #333 !important;
     }}
-
-    /* Typography */
-    h1, h2, h3 {{ font-family: 'Segoe UI', sans-serif; letter-spacing: -0.5px; }}
 </style>
-""", unsafe_allow_html=True)
+""".format(
+    bg_dark=BG_DARK, primary=PRIMARY, neon=NEON_GREEN, 
+    text_main=TEXT_MAIN, text_sub=TEXT_SUB
+)
+st.markdown(css_style, unsafe_allow_html=True)
 
-# --- HÀM STYLE BIỂU ĐỒ (NEON STYLE) ---
+# --- HÀM STYLE BIỂU ĐỒ ---
 def polish_chart(fig):
     fig.update_layout(
         template="plotly_dark",
@@ -113,7 +102,6 @@ def polish_chart(fig):
         margin=dict(t=40, b=20, l=10, r=10),
         hovermode="x unified",
     )
-    # Lưới mờ hơn
     fig.update_xaxes(showgrid=False, linecolor=GRID_COLOR)
     fig.update_yaxes(showgrid=True, gridcolor=GRID_COLOR, zerolinecolor=GRID_COLOR)
     return fig
@@ -146,7 +134,6 @@ def load_data():
             
         df['sl'] = pd.to_numeric(df['sl'], errors='coerce').fillna(0)
 
-        # Logic phân loại màu
         def categorize_detailed_color(v):
             v = v.strip()
             if any(x in v for x in ["BROWN", "COCOA", "BRONZE", "UMBER", "NAU", "WALNUT", "ESPRESSO"]): return "NÂU/GỖ"
@@ -169,7 +156,7 @@ df_raw, error = load_data()
 if error: st.error(error); st.stop()
 
 # ==========================================
-# 3. SIDEBAR & HEADER
+# 3. HEADER & SIDEBAR
 # ==========================================
 def get_base64_logo(path):
     if os.path.exists(path):
@@ -180,14 +167,13 @@ def get_base64_logo(path):
 logo_b64 = get_base64_logo("mocphat_logo.png")
 logo_img = f'<img src="data:image/png;base64,{logo_b64}" height="45">' if logo_b64 else "🌲"
 
-# Header Glassmorphism
 st.markdown(f"""
 <div class="header-sticky">
     <div style="display:flex; gap:15px; align-items:center;">
         {logo_img}
         <div>
             <div style="font-size:22px; font-weight:800; color:{NEON_GREEN}; text-shadow: 0 0 15px rgba(0,230,118,0.4);">MỘC PHÁT INTELLIGENCE</div>
-            <div style="font-size:12px; color:{TEXT_SUB}; letter-spacing:1px;">CYBER GLASS EDITION v7.0</div>
+            <div style="font-size:12px; color:{TEXT_SUB}; letter-spacing:1px;">CYBER GLASS EDITION</div>
         </div>
     </div>
     <div style="text-align:right;">
@@ -196,7 +182,6 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-# Sidebar
 st.sidebar.markdown("### 🎯 BỘ LỌC")
 years = sorted(df_raw['year'].unique(), reverse=True)
 sel_years = st.sidebar.multiselect("Năm", years, default=years)
@@ -208,7 +193,7 @@ if sel_cust: df = df[df['khach_hang'].isin(sel_cust)]
 if df.empty: st.warning("Không có dữ liệu!"); st.stop()
 
 # ==========================================
-# 4. KPI CARDS (HOLOGRAPHIC)
+# 4. KPI CARDS
 # ==========================================
 st.subheader("🚀 HIỆU QUẢ KINH DOANH")
 vol_by_year = df.groupby('year')['sl'].sum()
@@ -263,7 +248,6 @@ with tab1:
         ts_data = df.groupby('ym')['sl'].sum().reset_index().sort_values('ym')
         
         fig = go.Figure()
-        # Area chart với gradient
         fig.add_trace(go.Scatter(x=ts_data['ym'], y=ts_data['sl'], mode='lines+markers', name='Thực tế', 
                                  line=dict(color=NEON_GREEN, width=3, shape='spline'),
                                  fill='tozeroy', fillcolor='rgba(0, 230, 118, 0.15)')) 
@@ -271,7 +255,6 @@ with tab1:
         ts_data['ma3'] = ts_data['sl'].rolling(window=3).mean()
         fig.add_trace(go.Scatter(x=ts_data['ym'], y=ts_data['ma3'], mode='lines', name='TB 3 tháng', line=dict(color='#FFA726', dash='dot')))
         
-        # Anomaly
         std = ts_data['sl'].rolling(window=3).std()
         upper = ts_data['ma3'] + (1.8 * std)
         anomalies = ts_data[ts_data['sl'] > upper]
@@ -288,7 +271,7 @@ with tab1:
             mom = ((last_m['sl'] - prev_m['sl'])/prev_m['sl']*100) if prev_m['sl']>0 else 0
             
             st.markdown(f"""
-            <div class="insight-box">
+            <div style="background:linear-gradient(135deg, rgba(0, 230, 118, 0.05), transparent); border-left:3px solid {NEON_GREEN}; padding:15px; border-radius:8px; border:1px solid rgba(255,255,255,0.05);">
                 <div style="color:{NEON_GREEN}; font-weight:bold; margin-bottom:8px">🤖 AI Quick Stats:</div>
                 <div style="font-size:14px; color:{TEXT_MAIN}; line-height:1.6">
                 • Tháng <b>{last_m['ym'].strftime('%m/%Y')}</b> đạt <b>{fmt_num(last_m['sl'])}</b> SP.<br>
@@ -337,9 +320,9 @@ with tab2:
 with tab3:
     col_sun, col_bar = st.columns([2, 1])
     with col_sun:
-        st.subheader("🎨 Phân tích Màu Sắc (Sunburst)")
+        st.subheader("🎨 Phân tích Màu Sắc")
         color_data = df.groupby(['nhom_mau', 'mau_son'])['sl'].sum().reset_index()
-        color_data = color_data[color_data['sl'] > color_data['sl'].sum() * 0.01] # Lọc nhỏ
+        color_data = color_data[color_data['sl'] > color_data['sl'].sum() * 0.01] 
         fig_sun = px.sunburst(color_data, path=['nhom_mau', 'mau_son'], values='sl',
                               color_discrete_sequence=px.colors.qualitative.Set3)
         st.plotly_chart(polish_chart(fig_sun), use_container_width=True)
