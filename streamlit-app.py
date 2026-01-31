@@ -9,7 +9,7 @@ from datetime import datetime
 from st_aggrid import AgGrid, GridOptionsBuilder
 
 # ==========================================
-# 1. CẤU HÌNH GIAO DIỆN (CLEAN LUXURY EDITION)
+# 1. CẤU HÌNH GIAO DIỆN (NEON CENTERED EDITION)
 # ==========================================
 st.set_page_config(page_title="Mộc Phát Analytics Pro", layout="wide", page_icon="🌲")
 
@@ -17,77 +17,127 @@ st.set_page_config(page_title="Mộc Phát Analytics Pro", layout="wide", page_i
 PRIMARY = "#00C853"    
 NEON_GREEN = "#00E676" 
 BG_DARK = "#050505"    
-TEXT_MAIN = "#FAFAFA"
-TEXT_SUB = "#B0BEC5"
-GRID_COLOR = "rgba(255, 255, 255, 0.05)"
+TEXT_MAIN = "#FFFFFF"  # Đổi sang trắng tinh cho nổi
+TEXT_SUB = "#E0E0E0"   # Xám sáng hơn chút
+GRID_COLOR = "rgba(255, 255, 255, 0.08)"
 
-# --- CSS VISUAL EFFECTS (CLEAN & SMOOTH) ---
+# --- CSS VISUAL EFFECTS (CLEAN & POP) ---
 css_style = """
 <style>
-    /* 1. NỀN DEEP NEBULA (Sạch & Sang) */
+    /* 1. NỀN DEEP NEBULA */
     .stApp {{
         background-color: {bg_dark};
-        /* Hiệu ứng ánh sáng loang nhẹ ở góc, không rối mắt */
         background-image: 
-            radial-gradient(at 0% 0%, rgba(0, 200, 83, 0.15) 0px, transparent 50%),
-            radial-gradient(at 100% 100%, rgba(0, 230, 118, 0.1) 0px, transparent 50%);
+            radial-gradient(at 50% 0%, rgba(0, 200, 83, 0.1) 0px, transparent 50%),
+            radial-gradient(at 50% 100%, rgba(0, 230, 118, 0.05) 0px, transparent 50%);
         background-attachment: fixed;
     }}
 
-    /* 2. HEADER GLASSMORPHISM (Kính trong suốt) */
+    /* 2. HEADER CĂN GIỮA & LOGO NEON */
     .header-sticky {{
         position: sticky; top: 0; z-index: 999;
-        background: rgba(5, 5, 5, 0.8); /* Tối hơn để dễ đọc chữ */
+        background: rgba(10, 10, 10, 0.85);
         backdrop-filter: blur(20px);
-        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-        padding: 15px 25px; 
-        margin-bottom: 25px;
-        border-radius: 0 0 16px 16px;
-        display: flex; align-items: center; justify-content: space-between;
-        box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
+        border-bottom: 1px solid rgba(0, 230, 118, 0.3); /* Viền sáng hơn chút */
+        padding: 15px 0; 
+        margin-bottom: 30px;
+        display: flex; 
+        align-items: center; 
+        justify-content: center; /* CĂN GIỮA */
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        position: relative;
+    }}
+    
+    /* Hiệu ứng Logo Neon */
+    .glow-logo {{
+        filter: drop-shadow(0 0 8px {neon}); /* Phát sáng */
+        transition: transform 0.3s;
+    }}
+    .glow-logo:hover {{
+        transform: scale(1.1);
+        filter: drop-shadow(0 0 15px {neon});
     }}
 
-    /* 3. KPI CARDS (Minimalist Glow) */
+    /* Badge nằm tuyệt đối bên phải */
+    .header-badge {{
+        position: absolute;
+        right: 25px;
+        top: 50%;
+        transform: translateY(-50%);
+        border: 1px solid {primary};
+        color: {neon};
+        padding: 5px 15px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: bold;
+        background: rgba(0, 200, 83, 0.1);
+    }}
+
+    /* 3. TIÊU ĐỀ PHỤ (SUBHEADER) NỔI BẬT */
+    /* Target vào h3 của Streamlit (st.subheader) */
+    h3 {{
+        color: {neon} !important;          /* Màu xanh Neon */
+        font-family: 'Segoe UI', sans-serif;
+        font-weight: 700 !important;
+        text-shadow: 0 0 10px rgba(0, 230, 118, 0.3); /* Bóng sáng */
+        border-left: 4px solid {primary};  /* Vạch kẻ bên trái */
+        padding-left: 12px;
+        margin-top: 20px !important;
+        margin-bottom: 10px !important;
+    }}
+    
+    /* Target vào h1, h2 */
+    h1, h2 {{
+        color: {text_main} !important;
+        text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+    }}
+
+    /* 4. KPI CARDS (Depth & Glow) */
     .kpi-card {{
         background: rgba(30, 30, 30, 0.6);
         backdrop-filter: blur(10px);
         border-radius: 16px;
         padding: 20px;
-        border: 1px solid rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.08);
         border-left: 4px solid {primary};
-        box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.3);
         transition: all 0.3s ease;
     }}
     .kpi-card:hover {{
         transform: translateY(-5px);
         border-left-color: {neon};
-        box-shadow: 0 8px 25px rgba(0, 230, 118, 0.2);
-        background: rgba(40, 40, 40, 0.7);
+        box-shadow: 0 8px 30px rgba(0, 230, 118, 0.15);
+        background: rgba(45, 45, 45, 0.8);
+        border-top: 1px solid rgba(0, 230, 118, 0.3);
     }}
-    .kpi-lbl {{ font-size: 12px; color: {text_sub}; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px; }}
-    .kpi-val {{ font-size: 28px; font-weight: 800; color: {text_main}; letter-spacing: -0.5px; }}
+    .kpi-lbl {{ font-size: 13px; color: {text_sub}; text-transform: uppercase; letter-spacing: 1px; font-weight: 600; }}
+    .kpi-val {{ font-size: 32px; font-weight: 800; color: {text_main}; letter-spacing: -1px; margin: 5px 0; }}
 
-    /* 4. TABS & AGGRID */
-    .stTabs [data-baseweb="tab-list"] {{ gap: 8px; background: transparent; }}
+    /* 5. TABS & AGGRID */
+    .stTabs [data-baseweb="tab-list"] {{ gap: 10px; background: transparent; }}
     .stTabs [data-baseweb="tab"] {{ 
-        background-color: rgba(255,255,255,0.03); 
+        background-color: rgba(255,255,255,0.05); 
         color: {text_sub}; 
         border-radius: 8px; 
         border: 1px solid transparent;
+        padding: 8px 20px;
     }}
     .stTabs [aria-selected="true"] {{ 
-        border: 1px solid {primary};
+        border: 1px solid {neon};
         color: {neon};
-        background: rgba(0, 200, 83, 0.1);
+        background: rgba(0, 230, 118, 0.08);
+        font-weight: bold;
+        box-shadow: 0 0 15px rgba(0, 230, 118, 0.1);
     }}
     
     /* AgGrid Dark Theme Clean */
     .ag-theme-alpine-dark {{
         --ag-background-color: #0F0F0F !important;
-        --ag-header-background-color: #151515 !important;
+        --ag-header-background-color: #181818 !important;
         --ag-odd-row-background-color: #0F0F0F !important;
         --ag-foreground-color: {text_sub} !important;
         --ag-border-color: #333 !important;
+        font-family: 'Segoe UI', sans-serif !important;
     }}
 </style>
 """.format(
@@ -106,6 +156,7 @@ def polish_chart(fig):
         margin=dict(t=40, b=20, l=10, r=10),
         hovermode="x unified",
     )
+    # Lưới sáng hơn chút để dễ nhìn trên nền đen
     fig.update_xaxes(showgrid=False, linecolor=GRID_COLOR)
     fig.update_yaxes(showgrid=True, gridcolor=GRID_COLOR, zerolinecolor=GRID_COLOR)
     return fig
@@ -160,7 +211,7 @@ df_raw, error = load_data()
 if error: st.error(error); st.stop()
 
 # ==========================================
-# 3. HEADER & SIDEBAR
+# 3. HEADER (CENTERED & NEON LOGO)
 # ==========================================
 def get_base64_logo(path):
     if os.path.exists(path):
@@ -169,19 +220,22 @@ def get_base64_logo(path):
     return None
 
 logo_b64 = get_base64_logo("mocphat_logo.png")
-logo_img = f'<img src="data:image/png;base64,{logo_b64}" height="45">' if logo_b64 else "🌲"
+# Thêm class glow-logo cho ảnh
+logo_img = f'<img src="data:image/png;base64,{logo_b64}" height="60" class="glow-logo">' if logo_b64 else '<span style="font-size:50px">🌲</span>'
 
 st.markdown(f"""
 <div class="header-sticky">
-    <div style="display:flex; gap:15px; align-items:center;">
+    <div style="text-align:center;">
         {logo_img}
-        <div>
-            <div style="font-size:22px; font-weight:800; color:{NEON_GREEN}; letter-spacing:-0.5px;">MỘC PHÁT INTELLIGENCE</div>
-            <div style="font-size:12px; color:{TEXT_SUB}; letter-spacing:1px;">LUXURY ANALYTICS SUITE</div>
+        <div style="font-size:28px; font-weight:900; color:{NEON_GREEN}; letter-spacing:1px; margin-top:5px; text-shadow:0 0 10px rgba(0,230,118,0.5);">
+            MỘC PHÁT INTELLIGENCE
+        </div>
+        <div style="font-size:14px; color:{TEXT_SUB}; letter-spacing:2px; font-weight:300;">
+            EXECUTIVE DASHBOARD
         </div>
     </div>
-    <div style="text-align:right;">
-        <span style="font-weight:bold; color:{TEXT_MAIN}; border:1px solid {PRIMARY}; padding:5px 12px; border-radius:20px; font-size:11px; letter-spacing:1px;">MASTER 2023-2025</span>
+    <div class="header-badge">
+        MASTER 2023-2025
     </div>
 </div>
 """, unsafe_allow_html=True)
@@ -209,15 +263,15 @@ c1, c2, c3, c4 = st.columns(4)
 
 def kpi_card(col, lbl, val, sub_val, sub_lbl):
     val_str = f"{val:,.0f}" 
-    color = NEON_GREEN if sub_val >= 0 else "#EF5350"
+    color = NEON_GREEN if sub_val >= 0 else "#FF5252"
     icon = "▲" if sub_val >= 0 else "▼"
     
     col.markdown(f"""
     <div class="kpi-card">
         <div class="kpi-lbl">{lbl}</div>
         <div class="kpi-val">{val_str}</div>
-        <div style="font-size:13px; font-weight:600; margin-top:8px; color:{color}">
-            {icon} {abs(sub_val):.1f}% <span style="color:{TEXT_SUB}; font-weight:normal;">{sub_lbl}</span>
+        <div style="font-size:14px; font-weight:700; margin-top:8px; color:{color}">
+            {icon} {abs(sub_val):.1f}% <span style="color:{TEXT_SUB}; font-weight:normal; font-size:13px">{sub_lbl}</span>
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -280,12 +334,13 @@ with tab1:
             sl_fmt = f"{last_m['sl']:,.0f}"
             
             st.markdown(f"""
-            <div style="background:rgba(20, 20, 20, 0.5); border-left:3px solid {NEON_GREEN}; padding:15px; border-radius:8px; border:1px solid rgba(255,255,255,0.05);">
-                <div style="color:{NEON_GREEN}; font-weight:bold; margin-bottom:8px">🤖 AI Quick Stats:</div>
-                <div style="font-size:14px; color:{TEXT_MAIN}; line-height:1.6">
-                • Tháng <b>{last_m['ym'].strftime('%m/%Y')}</b> đạt <b>{sl_fmt}</b> SP.<br>
-                • Tăng trưởng: <b style="color:{NEON_GREEN if mom>0 else '#EF5350'}">{mom:+.1f}%</b> so với tháng trước.<br>
-                • Phát hiện <b>{len(anomalies)}</b> điểm bất thường.
+            <div style="background:rgba(20, 20, 20, 0.6); border-left:4px solid {NEON_GREEN}; padding:20px; border-radius:12px; border:1px solid rgba(255,255,255,0.08);">
+                <div style="color:{NEON_GREEN}; font-weight:800; margin-bottom:12px; font-size:16px;">🤖 AI QUICK STATS</div>
+                <div style="font-size:15px; color:{TEXT_MAIN}; line-height:1.8">
+                • Tháng <b>{last_m['ym'].strftime('%m/%Y')}</b>: <br>
+                  <span style="font-size:24px; font-weight:bold; color:{TEXT_MAIN}">{sl_fmt}</span> SP<br>
+                • Biến động: <b style="color:{NEON_GREEN if mom>0 else '#FF5252'}">{mom:+.1f}%</b> so với tháng trước.<br>
+                • Phát hiện <b style="color:#FFA726">{len(anomalies)}</b> điểm bất thường.
                 </div>
             </div>
             """, unsafe_allow_html=True)
@@ -309,11 +364,11 @@ with tab2:
         
         with col_info:
             st.markdown(f"""
-            <div style="background:rgba(255,167,38,0.1); border:1px solid #FFA726; padding:15px; border-radius:12px; display:flex; justify-content:space-around; align-items:center;">
-                <div style="text-align:center"><div style="font-size:12px; color:#aaa">2025 BASE</div><div style="font-size:24px; font-weight:bold">{v25}</div></div>
-                <div style="font-size:20px; color:#FFA726">➔</div>
-                <div style="text-align:center"><div style="font-size:12px; color:#aaa">2026 TARGET</div><div style="font-size:24px; font-weight:bold; color:{NEON_GREEN}">{v26}</div></div>
-                <div style="text-align:center"><div style="font-size:12px; color:#aaa">GAP (+{growth_target}%)</div><div style="font-size:24px; font-weight:bold; color:#FFA726">+{v_gap}</div></div>
+            <div style="background:rgba(255,167,38,0.05); border:1px solid #FFA726; padding:20px; border-radius:12px; display:flex; justify-content:space-around; align-items:center;">
+                <div style="text-align:center"><div style="font-size:13px; color:#aaa; font-weight:600">2025 BASE</div><div style="font-size:28px; font-weight:bold">{v25}</div></div>
+                <div style="font-size:24px; color:#FFA726">➔</div>
+                <div style="text-align:center"><div style="font-size:13px; color:#aaa; font-weight:600">2026 TARGET</div><div style="font-size:28px; font-weight:bold; color:{NEON_GREEN}">{v26}</div></div>
+                <div style="text-align:center"><div style="font-size:13px; color:#aaa; font-weight:600">GAP (+{growth_target}%)</div><div style="font-size:28px; font-weight:bold; color:#FFA726">+{v_gap}</div></div>
             </div>
             """, unsafe_allow_html=True)
             
