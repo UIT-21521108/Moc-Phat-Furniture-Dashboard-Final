@@ -10,11 +10,11 @@ from datetime import datetime
 from st_aggrid import AgGrid, GridOptionsBuilder
 
 # ==========================================
-# 1. CẤU HÌNH GIAO DIỆN (PREMIUM NEON DARK)
+# 1. CẤU HÌNH GIAO DIỆN
 # ==========================================
-st.set_page_config(page_title="Mộc Phát Analytics Pro", layout="wide", page_icon="🌲")
+st.set_page_config(page_title="Mộc Phát Analytics", layout="wide", page_icon="🌲")
 
-# Bảng màu Neon Dark
+# MÀU SẮC
 PRIMARY = "#066839"    
 NEON_GREEN = "#00E676" 
 ACCENT  = "#66BB6A"    
@@ -24,203 +24,97 @@ TEXT_MAIN = "#E0E0E0"
 TEXT_SUB = "#9E9E9E"
 GRID_COLOR = "#2A2A2A"
 
-def get_base64_logo(path):
-    # Kiểm tra path an toàn để tránh lỗi trên server
-    if os.path.exists(path):
-        with open(path, "rb") as f:
-            return base64.b64encode(f.read()).decode()
-    return None
-
-def fmt_num(n):
-    return f"{n:,.0f}"
-
-# --- HÀM STYLE BIỂU ĐỒ ---
+# --- HÀM STYLE BIỂU ĐỒ (SAFE MODE) ---
 def polish_chart(fig):
     fig.update_layout(
         template="plotly_dark",
         paper_bgcolor='rgba(0,0,0,0)', 
         plot_bgcolor='rgba(0,0,0,0)',
-        font=dict(color=TEXT_SUB, family="Segoe UI"),
+        font=dict(color=TEXT_SUB, family="sans-serif"),
         margin=dict(t=40, b=20, l=10, r=10),
         hovermode="x unified"
+        # Đã bỏ barcornerradius để tránh lỗi version cũ
     )
     fig.update_xaxes(showgrid=False, linecolor=GRID_COLOR)
     fig.update_yaxes(showgrid=True, gridcolor=GRID_COLOR, zerolinecolor=GRID_COLOR)
     return fig
 
-# --- CSS HIỆU ỨNG ĐẶC BIỆT & INTRO ANIMATION ---
-# LƯU Ý QUAN TRỌNG: Trong Python f-string, dấu { của CSS phải viết là {{
-st.markdown(f"""
+# --- CSS AN TOÀN (Dùng format thay vì f-string phức tạp) ---
+css_code = """
 <style>
-    /* 1. KEYFRAMES ANIMATION */
-    @keyframes fadeInUp {{
-        from {{ opacity: 0; transform: translate3d(0, 40px, 0); }}
-        to {{ opacity: 1; transform: translate3d(0, 0, 0); }}
-    }}
+    /* Tổng thể */
+    .stApp {{ background-color: {bg}; }}
+    h1, h2, h3, h4 {{ color: {text} !important; }}
+    .stMarkdown p, .stMarkdown li {{ color: {sub} !important; }}
     
-    @keyframes pulse-glow {{
-        0% {{ box-shadow: 0 0 0 0 rgba(0, 230, 118, 0.4); }}
-        70% {{ box-shadow: 0 0 0 20px rgba(0, 230, 118, 0); }}
-        100% {{ box-shadow: 0 0 0 0 rgba(0, 230, 118, 0); }}
-    }}
-
-    @keyframes loading-bar {{
-        0% {{ width: 0%; }}
-        100% {{ width: 100%; }}
-    }}
-
-    /* 2. Áp dụng hiệu ứng xuất hiện cho toàn bộ App */
-    .stApp {{ 
-        background-color: {BG_COLOR}; 
-        animation: fadeInUp 0.8s ease-out;
-    }}
-
-    /* 3. Typography & Elements */
-    h1, h2, h3, h4 {{ color: {TEXT_MAIN} !important; font-family: 'Segoe UI', sans-serif; }}
-    .stMarkdown p, .stMarkdown li {{ color: {TEXT_SUB} !important; }}
-    
-    /* 4. Header Sticky Glowing */
+    /* Header */
     .header-sticky {{
-        position: sticky; top: 15px; z-index: 999;
-        background: rgba(18, 18, 18, 0.95);
-        backdrop-filter: blur(10px);
-        border-bottom: 2px solid {PRIMARY};
-        padding: 15px 25px; 
-        margin: -50px 0px 25px 0px;
-        border-radius: 16px;
-        display: flex; align-items: center; justify-content: space-between;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.5);
-        transition: all 0.3s ease;
-    }}
-    .header-sticky:hover {{
-        border-bottom: 2px solid {NEON_GREEN};
-        box-shadow: 0 0 25px rgba(0, 230, 118, 0.4);
-    }}
-    .app-title {{ font-size: 26px; font-weight: 800; color: {ACCENT}; margin: 0; }}
-
-    /* 5. KPI Cards - Float & Glow */
-    .kpi-card {{
-        background: {CARD_BG}; 
-        border-radius: 16px;
-        padding: 20px;
-        border-left: 5px solid {PRIMARY};
-        border-top: 1px solid rgba(255,255,255,0.05);
-        box-shadow: 0 4px 10px rgba(0,0,0,0.4);
-        transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-    }}
-    .kpi-card:hover {{
-        transform: translateY(-10px);
-        border-left: 5px solid {NEON_GREEN};
-        box-shadow: 0 15px 35px rgba(0, 230, 118, 0.2);
-    }}
-    .kpi-val {{ font-size: 28px; font-weight: 800; color: {TEXT_MAIN}; transition: color 0.3s; }}
-    .kpi-card:hover .kpi-val {{ color: {NEON_GREEN}; }}
-
-    /* 6. Insight Box */
-    .insight-box {{
-        background: linear-gradient(135deg, rgba(6, 104, 57, 0.3), rgba(0,0,0,0)); 
-        border: 1px solid {PRIMARY};
-        padding: 15px; border-radius: 12px; margin-bottom: 20px;
-        animation: pulse-glow 3s infinite;
+        position: sticky; top: 0; z-index: 999;
+        background: {card_bg};
+        border-bottom: 2px solid {primary};
+        padding: 15px 20px; 
+        margin-bottom: 20px;
+        display: flex; justify-content: space-between; align-items: center;
     }}
     
-    /* 7. Forecast Box */
-    .forecast-box {{
-        background: linear-gradient(135deg, rgba(255, 167, 38, 0.15), rgba(0,0,0,0));
-        border: 1px solid #FFA726;
-        padding: 15px; border-radius: 12px; margin-bottom: 20px;
+    /* KPI Cards */
+    .kpi-card {{
+        background: {card_bg}; 
+        border-radius: 10px; padding: 20px;
+        border-left: 5px solid {primary};
+        box-shadow: 0 4px 6px rgba(0,0,0,0.3);
         transition: transform 0.3s;
     }}
-    .forecast-box:hover {{ transform: scale(1.02); box-shadow: 0 0 20px rgba(255, 167, 38, 0.3); }}
-
-    /* 8. Tabs */
-    .stTabs [data-baseweb="tab-list"] {{ gap: 8px; }}
-    .stTabs [data-baseweb="tab"] {{ 
-        background-color: {CARD_BG}; color: {TEXT_SUB}; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05);
-        transition: all 0.3s;
+    .kpi-card:hover {{
+        transform: translateY(-5px);
+        border-left: 5px solid {neon};
+        box-shadow: 0 5px 15px rgba(0, 230, 118, 0.2);
     }}
-    .stTabs [data-baseweb="tab"]:hover {{ color: {NEON_GREEN}; border-color: {NEON_GREEN}; }}
-    .stTabs [aria-selected="true"] {{ background-color: {PRIMARY}; color: white; border: none; box-shadow: 0 0 15px rgba(6,104,57,0.6); }}
-
-    /* 9. AG-GRID */
+    .kpi-val {{ font-size: 28px; font-weight: bold; color: {text}; }}
+    
+    /* AgGrid fix */
     .ag-theme-alpine-dark {{
-        --ag-background-color: {CARD_BG} !important;
-        --ag-header-background-color: #161616 !important;
-        --ag-odd-row-background-color: rgba(255,255,255,0.02) !important;
-        --ag-foreground-color: {TEXT_SUB} !important;
-        --ag-border-color: rgba(255,255,255,0.1) !important;
-        --ag-header-foreground-color: {ACCENT} !important;
-        --ag-row-hover-color: rgba(6, 104, 57, 0.3) !important;
-        font-family: 'Segoe UI' !important;
+        --ag-background-color: {card_bg} !important;
+        --ag-odd-row-background-color: {card_bg} !important;
     }}
-    .stAgGrid {{
-        border-radius: 12px; overflow: hidden;
-        border: 1px solid rgba(255,255,255,0.05);
-        box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-        transition: box-shadow 0.3s;
-    }}
-    .stAgGrid:hover {{ box-shadow: 0 0 20px rgba(0, 230, 118, 0.15); }}
 </style>
-""", unsafe_allow_html=True)
+""".format(
+    bg=BG_COLOR, text=TEXT_MAIN, sub=TEXT_SUB, 
+    card_bg=CARD_BG, primary=PRIMARY, neon=NEON_GREEN
+)
+st.markdown(css_code, unsafe_allow_html=True)
 
 # ==========================================
-# 2. XỬ LÝ INTRO ANIMATION
+# 2. XỬ LÝ DỮ LIỆU (CƠ CHẾ DUMMY DATA)
 # ==========================================
-def run_intro_animation():
-    intro_holder = st.empty()
-    
-    # CSS riêng cho Splash (Không dùng f-string để tránh rối cú pháp)
-    splash_css = f"""
-    <style>
-        .splash-container {{
-            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
-            background-color: {BG_COLOR};
-            z-index: 999999;
-            display: flex; flex-direction: column; justify-content: center; align-items: center;
-            color: {NEON_GREEN}; font-family: 'Segoe UI', sans-serif;
-        }}
-        .splash-logo {{ width: 150px; margin-bottom: 30px; filter: drop-shadow(0 0 15px {PRIMARY}); animation: pulse-logo 1.5s infinite alternate; }}
-        @keyframes pulse-logo {{ from {{ transform: scale(1); opacity: 0.8; }} to {{ transform: scale(1.1); opacity: 1; }} }}
-        .loader-bar {{ width: 300px; height: 4px; background: #333; border-radius: 2px; overflow: hidden; margin-top: 20px; }}
-        .loader-fill {{ height: 100%; background: {NEON_GREEN}; width: 0%; animation: loading-bar 2.5s ease-in-out forwards; box-shadow: 0 0 15px {NEON_GREEN}; }}
-        .loading-text {{ margin-top: 15px; font-size: 14px; letter-spacing: 3px; color: {TEXT_SUB}; text-transform: uppercase; }}
-    </style>
-    """
-    
-    logo_b64 = get_base64_logo("mocphat_logo.png")
-    logo_html = f'<img src="data:image/png;base64,{logo_b64}" class="splash-logo">' if logo_b64 else f'<h1 style="font-size:60px; color:{NEON_GREEN}">🌲</h1>'
+def generate_dummy_data():
+    """Tạo dữ liệu giả nếu không đọc được file"""
+    dates = pd.date_range(start='2023-01-01', end='2025-12-31', freq='M')
+    data = []
+    for d in dates:
+        data.append({
+            'year': d.year, 'month': d.month, 'ym': d,
+            'khach_hang': np.random.choice(['HOMEGOODS', 'TJMAXX', 'MARSHALLS', 'ROSS'], p=[0.4, 0.3, 0.2, 0.1]),
+            'ma_hang': f'SKU-{np.random.randint(100,999)}',
+            'nhom_mau': np.random.choice(['NÂU/GỖ', 'TRẮNG/KEM', 'ĐEN/TỐI', 'XÁM'], p=[0.5, 0.2, 0.2, 0.1]),
+            'mau_son': 'Sample Color',
+            'mua': np.random.choice(['Xuân', 'Hè', 'Thu', 'Đông']),
+            'is_usb_clean': np.random.choice(['Có USB', 'Không USB']),
+            'sl': np.random.randint(100, 1000)
+        })
+    return pd.DataFrame(data)
 
-    intro_holder.markdown(f"""
-        {splash_css}
-        <div class="splash-container">
-            {logo_html}
-            <div style="font-size: 24px; font-weight: 800; letter-spacing: 2px;">MỘC PHÁT INTELLIGENCE</div>
-            <div class="loader-bar"><div class="loader-fill"></div></div>
-            <div class="loading-text">Initializing System...</div>
-        </div>
-    """, unsafe_allow_html=True)
-    
-    time.sleep(2.5) # Giả lập thời gian load
-    intro_holder.empty()
-
-# Chỉ chạy Intro khi chưa có trong session_state
-if 'intro_shown' not in st.session_state:
-    run_intro_animation()
-    st.session_state['intro_shown'] = True
-
-# ==========================================
-# 3. LOAD DATA (CÓ XỬ LÝ LỖI FILE)
-# ==========================================
 @st.cache_data(ttl=3600)
 def load_data():
     FILE_NAME = "Master_2023_2025_PRO_clean.xlsx"
     
-    # Kiểm tra file có tồn tại không
-    if not os.path.exists(FILE_NAME): 
-        return None, f"⚠️ LỖI: Không tìm thấy file '{FILE_NAME}'. Vui lòng Upload file lên GitHub hoặc cùng thư mục."
+    # Check file tồn tại
+    if not os.path.exists(FILE_NAME):
+        return None, "FILE_NOT_FOUND"
     
     try:
         df = pd.read_excel(FILE_NAME, engine='openpyxl')
+        # Chuẩn hóa tên cột
         df.columns = [str(c).strip().lower() for c in df.columns]
         
         # Xử lý ngày tháng
@@ -229,84 +123,88 @@ def load_data():
         df = df[(df['year'] > 2020) & (df['month'].between(1, 12))]
         df['ym'] = pd.to_datetime(df.assign(day=1)[['year', 'month', 'day']])
         
+        # Mapping mùa
         season_map = {12:'Đông', 1:'Đông', 2:'Đông', 3:'Xuân', 4:'Xuân', 5:'Xuân', 
                       6:'Hè', 7:'Hè', 8:'Hè', 9:'Thu', 10:'Thu', 11:'Thu'}
         df['mua'] = df['month'].map(season_map)
         
-        # Xử lý Text
-        cols_text = ['khach_hang', 'ma_hang', 'mau_son', 'khu_vuc', 'dim', 'mo_ta']
-        for c in cols_text:
-            if c not in df.columns: df[c] = "Unknown"
-            else: df[c] = df[c].fillna("Unknown").astype(str).str.upper()
+        # Xử lý text & số
         df['sl'] = pd.to_numeric(df['sl'], errors='coerce').fillna(0)
-
-        # Logic Màu
-        def categorize_detailed_color(v):
-            v = v.strip()
-            if any(x in v for x in ["BROWN", "COCOA", "BRONZE", "UMBER", "NAU", "WALNUT", "ESPRESSO"]): return "NÂU/GỖ"
-            if any(x in v for x in ["WHITE", "CREAM", "IVORY", "TRANG", "OFF WHITE", "WASH"]): return "TRẮNG/KEM"
-            if any(x in v for x in ["BLACK", "DEN", "CHARCOAL", "EBONY"]): return "ĐEN/TỐI"
-            if any(x in v for x in ["GREY", "GRAY", "XAM", "SLATE"]): return "XÁM"
-            if any(x in v for x in ["NATURAL", "OAK", "PINE", "HONEY", "TU NHIEN"]): return "TỰ NHIÊN"
-            if any(x in v for x in ["BLUE", "NAVY"]): return "XANH DƯƠNG"
-            if any(x in v for x in ["GREEN", "SAGE"]): return "XANH LÁ"
-            return "MÀU KHÁC"
         
+        # Xử lý cột màu (nếu có)
         if 'mau_son' in df.columns:
-            df['nhom_mau'] = df['mau_son'].apply(categorize_detailed_color)
+            df['mau_son'] = df['mau_son'].fillna("Unknown").astype(str).str.upper()
+            def get_group(v):
+                if any(x in v for x in ["BROWN", "NAU", "WALNUT"]): return "NÂU/GỖ"
+                if any(x in v for x in ["WHITE", "TRANG", "CREAM"]): return "TRẮNG/KEM"
+                if any(x in v for x in ["BLACK", "DEN"]): return "ĐEN/TỐI"
+                return "KHÁC"
+            df['nhom_mau'] = df['mau_son'].apply(get_group)
         else:
-            df['nhom_mau'] = "N/A"
+            df['nhom_mau'] = "KHÁC"
+            df['mau_son'] = "N/A"
 
+        # Xử lý USB
         if 'is_usb' in df.columns:
             df['is_usb_clean'] = df['is_usb'].astype(str).apply(lambda x: 'Có USB' if 'true' in x.lower() else 'Không USB')
         else:
             df['is_usb_clean'] = 'N/A'
-
+            
         return df, None
-    except Exception as e:
-        return None, f"Lỗi đọc file Excel: {str(e)}"
 
+    except Exception as e:
+        return None, str(e)
+
+# LOAD DỮ LIỆU
 df_raw, error = load_data()
 
-# Nếu lỗi file, dừng app và hiện thông báo
+# LOGIC XỬ LÝ KHI LỖI
+is_demo = False
 if error:
-    st.error(error)
-    st.stop()
+    if error == "FILE_NOT_FOUND":
+        st.warning(f"⚠️ Không tìm thấy file 'Master_2023_2025_PRO_clean.xlsx'. Đang chạy chế độ DEMO DATA.")
+    else:
+        st.error(f"⚠️ Lỗi đọc file: {error}. Đang chạy chế độ DEMO DATA.")
+    
+    # Tạo data giả để App không bị sập
+    df_raw = generate_dummy_data()
+    is_demo = True
 
 # ==========================================
-# 4. HEADER & SIDEBAR
+# 3. GIAO DIỆN CHÍNH
 # ==========================================
-logo_b64 = get_base64_logo("mocphat_logo.png")
-logo_img = f'<img src="data:image/png;base64,{logo_b64}" height="50">' if logo_b64 else "🌲"
-
+# Header
 st.markdown(f"""
 <div class="header-sticky">
-    <div style="display:flex; gap:15px; align-items:center;">
-        {logo_img}
-        <div>
-            <div class="app-title">MỘC PHÁT INTELLIGENCE</div>
-            <div style="font-size:13px; color:{TEXT_SUB};">System Ready • Real-time Analytics</div>
-        </div>
+    <div>
+        <h2 style="margin:0; color:{ACCENT}">MỘC PHÁT INTELLIGENCE</h2>
+        <small style="color:{TEXT_SUB}">System Status: {'🟢 Online (Real Data)' if not is_demo else '🟡 Demo Mode'}</small>
     </div>
-    <div style="text-align:right;">
-        <span style="font-weight:bold; color:{ACCENT}; font-size:14px; text-shadow: 0 0 10px rgba(102,187,106,0.5);">Master 2023-2025</span>
-    </div>
+    <div style="font-weight:bold; color:{PRIMARY}">Dashboard v6.0</div>
 </div>
 """, unsafe_allow_html=True)
 
+# Sidebar
 st.sidebar.markdown("### 🎯 BỘ LỌC")
 years = sorted(df_raw['year'].unique(), reverse=True)
 sel_years = st.sidebar.multiselect("Năm", years, default=years)
-sel_cust = st.sidebar.multiselect("Khách Hàng", sorted(df_raw['khach_hang'].unique()))
 
+if 'khach_hang' in df_raw.columns:
+    custs = sorted(df_raw['khach_hang'].unique())
+    sel_cust = st.sidebar.multiselect("Khách Hàng", custs)
+else:
+    sel_cust = []
+
+# Filter Data
 df = df_raw.copy()
 if sel_years: df = df[df['year'].isin(sel_years)]
 if sel_cust: df = df[df['khach_hang'].isin(sel_cust)]
-if df.empty: st.warning("Không có dữ liệu!"); st.stop()
 
-# ==========================================
-# 5. KPI CARDS
-# ==========================================
+if df.empty:
+    st.warning("Không có dữ liệu phù hợp bộ lọc.")
+    st.stop()
+
+# --- KPI CARDS ---
 st.subheader("🚀 HIỆU QUẢ KINH DOANH")
 vol_by_year = df.groupby('year')['sl'].sum()
 v24 = vol_by_year.get(2024, 0)
@@ -314,197 +212,83 @@ v23 = vol_by_year.get(2023, 0)
 g24 = ((v24 - v23) / v23 * 100) if v23 > 0 else 0
 
 c1, c2, c3, c4 = st.columns(4)
-def kpi_card(col, year_label, val, growth_val, compare_label="so với năm trước"):
-    color_class = NEON_GREEN if growth_val >= 0 else "#EF5350"
-    icon = "▲" if growth_val >= 0 else "▼"
+
+def card(col, lbl, val, sub):
     col.markdown(f"""
     <div class="kpi-card">
-        <div class="kpi-lbl">{year_label}</div>
-        <div class="kpi-val">{fmt_num(val)}</div>
-        <div class="kpi-sub" style="color: {color_class}">
-            {icon} {abs(growth_val):.1f}% <span style="color:#A0A0A0; font-weight:normal;">{compare_label}</span>
-        </div>
+        <div style="font-size:12px; color:#888">{lbl}</div>
+        <div class="kpi-val">{val:,.0f}</div>
+        <div style="color:{NEON_GREEN}">{sub}</div>
     </div>
     """, unsafe_allow_html=True)
 
-kpi_card(c1, "SẢN LƯỢNG 2023", v23, 0, "(Base)")
-kpi_card(c2, "SẢN LƯỢNG 2024", v24, g24, "vs 2023")
-kpi_card(c3, "SẢN LƯỢNG 2025", vol_by_year.get(2025,0), 0, "(Current)")
-kpi_card(c4, "KHÁCH HÀNG ACTIVE", df['khach_hang'].nunique(), 0, "Đối tác")
+card(c1, "SẢN LƯỢNG 2023", v23, "(Base)")
+card(c2, "SẢN LƯỢNG 2024", v24, f"{g24:+.1f}% vs 23")
+card(c3, "SẢN LƯỢNG 2025", vol_by_year.get(2025,0), "(Current)")
+card(c4, "SỐ LƯỢNG KHÁCH", df['khach_hang'].nunique() if 'khach_hang' in df.columns else 0, "Active")
 
 st.markdown("---")
 
-# ==========================================
-# 6. TABS PHÂN TÍCH
-# ==========================================
-tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
-    "📊 TỔNG QUAN", "🎯 KẾ HOẠCH 2026", "🎨 SỨC KHỎE SP", "🌡️ MÙA VỤ", "⚖️ KHÁCH HÀNG", "📋 DỮ LIỆU"
-])
+# --- TABS ---
+t1, t2, t3, t4 = st.tabs(["📊 TỔNG QUAN", "🎯 KẾ HOẠCH 2026", "🎨 SỨC KHỎE SP", "📋 DỮ LIỆU"])
 
-# Hàm Render AgGrid chuẩn (không bị lỗi version)
-def render_dark_aggrid(dataframe, height=400):
-    gb = GridOptionsBuilder.from_dataframe(dataframe)
-    gb.configure_pagination(paginationAutoPageSize=True)
-    gb.configure_selection('multiple', use_checkbox=True)
-    gb.configure_default_column(resizable=True, filterable=True, sortable=True)
-    
-    # Format số
-    for col in dataframe.select_dtypes(include=['number']).columns:
-        gb.configure_column(col, type=["numericColumn", "numberColumnFilter"], precision=0)
-    
-    gridOptions = gb.build()
-    
-    # Quan trọng: reload_data=False để tránh reload loop
-    AgGrid(dataframe, gridOptions=gridOptions, height=height, 
-           theme='alpine-dark', enable_enterprise_modules=False,
-           allow_unsafe_jscode=True, update_mode='MODEL_CHANGED')
-
-# --- TAB 1: TỔNG QUAN ---
-with tab1:
-    c1_left, c1_right = st.columns([3, 1])
-    with c1_left:
-        st.subheader("📈 Xu hướng & Phát hiện Bất thường")
-        ts_data = df.groupby('ym')['sl'].sum().reset_index().sort_values('ym')
-        fig = go.Figure()
-        fig.add_trace(go.Scatter(x=ts_data['ym'], y=ts_data['sl'], mode='lines+markers', name='Thực tế', 
-                                 line=dict(color=NEON_GREEN, width=3, shape='spline'),
-                                 fill='tozeroy', fillcolor='rgba(0, 230, 118, 0.1)')) 
-        ts_data['ma3'] = ts_data['sl'].rolling(window=3).mean()
-        fig.add_trace(go.Scatter(x=ts_data['ym'], y=ts_data['ma3'], mode='lines', name='TB 3 tháng', line=dict(color='#FFA726', dash='dot')))
-        std = ts_data['sl'].rolling(window=3).std()
-        upper = ts_data['ma3'] + (1.8 * std)
-        anomalies = ts_data[ts_data['sl'] > upper]
-        if not anomalies.empty:
-            fig.add_trace(go.Scatter(x=anomalies['ym'], y=anomalies['sl'], mode='markers', name='Đột biến', marker=dict(color='#EF5350', size=12, symbol='star')))
+with t1:
+    c_left, c_right = st.columns([3, 1])
+    with c_left:
+        # Chart Trend
+        ts = df.groupby('ym')['sl'].sum().reset_index().sort_values('ym')
+        fig = px.area(ts, x='ym', y='sl', title="Xu hướng Sản lượng")
+        fig.update_traces(line_color=NEON_GREEN)
         st.plotly_chart(polish_chart(fig), use_container_width=True)
+    with c_right:
+        st.info("💡 **Ghi chú:** Biểu đồ thể hiện biến động sản lượng theo tháng. Đường màu xanh neon biểu thị xu hướng tăng trưởng tích cực.")
 
-    with c1_right:
-        if not ts_data.empty:
-            last_m = ts_data.iloc[-1]
-            prev_m = ts_data.iloc[-2] if len(ts_data) > 1 else last_m
-            mom = ((last_m['sl'] - prev_m['sl'])/prev_m['sl']*100) if prev_m['sl']>0 else 0
-            st.markdown(f"""
-            <div class="insight-box">
-                <div class="insight-title">🤖 AI Phân tích nhanh:</div>
-                <ul style="margin:0; padding-left:20px; font-size:14px; color: {TEXT_MAIN}">
-                    <li>Tháng <b>{last_m['ym'].strftime('%m/%Y')}</b>: <b>{fmt_num(last_m['sl'])}</b> SP.</li>
-                    <li>Biến động: <b style="color:{NEON_GREEN if mom>0 else '#EF5350'}">{mom:+.1f}%</b>.</li>
-                    <li>Phát hiện <b>{len(anomalies)}</b> điểm bất thường.</li>
-                </ul>
-            </div>
-            """, unsafe_allow_html=True)
-
-# --- TAB 2: KẾ HOẠCH 2026 ---
-with tab2:
-    st.subheader("🎯 Dự báo Kế hoạch 2026")
-    col_input, col_info = st.columns([1, 2])
-    with col_input:
-        growth_target = st.slider("Mục tiêu Tăng trưởng (%)", 0, 100, 15, 5)
-        growth_factor = 1 + (growth_target / 100)
+with t2:
+    st.subheader("Kế hoạch 2026")
+    growth = st.slider("Mục tiêu tăng trưởng (%)", 0, 100, 15)
     
-    base_2025 = df_raw[df_raw['year'] == 2025].copy()
-    if not base_2025.empty:
-        sl_2025_total = base_2025['sl'].sum()
-        sl_2026_target = sl_2025_total * growth_factor
-        sl_increase = sl_2026_target - sl_2025_total
+    # Logic đơn giản cho kế hoạch
+    base_25 = df[df['year']==2025]['sl'].sum()
+    if base_25 == 0: base_25 = v24 # Fallback nếu chưa có 2025
+    
+    target = base_25 * (1 + growth/100)
+    
+    c_k1, c_k2 = st.columns(2)
+    with c_k1:
+        st.metric("Sản lượng Nền (2025)", f"{base_25:,.0f}")
+    with c_k2:
+        st.metric(f"Mục tiêu 2026 (+{growth}%)", f"{target:,.0f}", delta=f"+{target-base_25:,.0f}")
         
-        with col_info:
-            st.markdown(f"""
-            <div class="forecast-box">
-                <h4 style="margin:0; color:#FFA726">KỊCH BẢN +{growth_target}%</h4>
-                <div style="display:flex; justify-content:space-between; margin-top:10px;">
-                    <div><div style="font-size:12px; color:{TEXT_SUB}">2025 Base</div><div style="font-size:20px; font-weight:bold">{fmt_num(sl_2025_total)}</div></div>
-                    <div><div style="font-size:12px; color:{TEXT_SUB}">2026 Target</div><div style="font-size:20px; font-weight:bold; color:{NEON_GREEN}">{fmt_num(sl_2026_target)}</div></div>
-                    <div><div style="font-size:12px; color:{TEXT_SUB}">Tăng thêm</div><div style="font-size:20px; font-weight:bold; color:#FFA726">+{fmt_num(sl_increase)}</div></div>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-            
-        monthly_2025 = base_2025.groupby('month')['sl'].sum().reset_index()
-        monthly_2026 = monthly_2025.copy()
-        monthly_2026['sl'] = monthly_2026['sl'] * growth_factor
-        monthly_2026['Type'] = 'Mục tiêu 2026'
-        monthly_2025['Type'] = 'Thực tế 2025'
-        combined_forecast = pd.concat([monthly_2025, monthly_2026])
-        fig_forecast = px.line(combined_forecast, x='month', y='sl', color='Type', markers=True, 
-                               color_discrete_map={'Thực tế 2025': '#757575', 'Mục tiêu 2026': NEON_GREEN})
-        fig_forecast.update_traces(line=dict(width=3))
-        st.plotly_chart(polish_chart(fig_forecast), use_container_width=True)
-        
-        c_f1, c_f2 = st.columns(2)
-        with c_f1:
-            color_2025 = base_2025.groupby('nhom_mau')['sl'].sum().reset_index()
-            color_2025['sl_target'] = color_2025['sl'] * growth_factor
-            fig_bar = px.bar(color_2025, x='sl_target', y='nhom_mau', orientation='h', text_auto='.2s', 
-                             color_discrete_sequence=[ACCENT], title="Mục tiêu Màu Sắc")
+    # Chart dự báo đơn giản
+    df_forecast = pd.DataFrame({
+        'Năm': ['2025 (Thực tế)', '2026 (Mục tiêu)'],
+        'Sản lượng': [base_25, target]
+    })
+    fig_f = px.bar(df_forecast, x='Năm', y='Sản lượng', color='Năm', 
+                   color_discrete_map={'2025 (Thực tế)': '#555', '2026 (Mục tiêu)': NEON_GREEN})
+    st.plotly_chart(polish_chart(fig_f), use_container_width=True)
+
+with t3:
+    st.subheader("Phân tích Màu & SKU")
+    c3_1, c3_2 = st.columns(2)
+    with c3_1:
+        if 'nhom_mau' in df.columns:
+            grp_color = df.groupby('nhom_mau')['sl'].sum().reset_index()
+            fig_pie = px.pie(grp_color, values='sl', names='nhom_mau', hole=0.5, title="Cơ cấu Màu")
+            st.plotly_chart(polish_chart(fig_pie), use_container_width=True)
+    with c3_2:
+        if 'ma_hang' in df.columns:
+            top_sku = df.groupby('ma_hang')['sl'].sum().nlargest(10).reset_index()
+            fig_bar = px.bar(top_sku, x='sl', y='ma_hang', orientation='h', title="Top 10 SKU")
+            fig_bar.update_traces(marker_color=PRIMARY)
             st.plotly_chart(polish_chart(fig_bar), use_container_width=True)
-        with c_f2:
-            cust_2025 = base_2025.groupby('khach_hang')['sl'].sum().nlargest(10).reset_index().sort_values('sl')
-            cust_2025['sl_target'] = cust_2025['sl'] * growth_factor
-            fig_bar2 = px.bar(cust_2025, x='sl_target', y='khach_hang', orientation='h', text_auto='.2s', 
-                              color_discrete_sequence=['#FFA726'], title="Mục tiêu Khách Hàng")
-            st.plotly_chart(polish_chart(fig_bar2), use_container_width=True)
 
-# --- TAB 3: SỨC KHỎE SP ---
-with tab3:
-    st.subheader("🎨 Sunburst Chart")
-    col_detail_1, col_detail_2 = st.columns([2, 1])
-    with col_detail_1:
-        color_data = df.groupby(['nhom_mau', 'mau_son'])['sl'].sum().reset_index()
-        total_sl_color = color_data['sl'].sum()
-        color_data = color_data[color_data['sl'] > (total_sl_color * 0.005)]
-        fig_sun = px.sunburst(color_data, path=['nhom_mau', 'mau_son'], values='sl', color='nhom_mau',
-            color_discrete_map={"NÂU/GỖ": "#8D6E63", "TRẮNG/KEM": "#FFF9C4", "ĐEN/TỐI": "#424242", "XÁM": "#90A4AE", "TỰ NHIÊN": "#FFCC80"})
-        st.plotly_chart(polish_chart(fig_sun), use_container_width=True)
-    with col_detail_2:
-        top_colors = df.groupby('mau_son')['sl'].sum().nlargest(10).sort_values(ascending=True).reset_index()
-        fig_bar_col = px.bar(top_colors, x='sl', y='mau_son', orientation='h', text_auto='.2s', color='sl', color_continuous_scale='Greens')
-        st.plotly_chart(polish_chart(fig_bar_col), use_container_width=True)
-    c2_1, c2_2 = st.columns(2)
-    with c2_1:
-        top_sku = df.groupby('ma_hang')['sl'].sum().nlargest(10).sort_values(ascending=True).reset_index()
-        fig_sku = px.bar(top_sku, x='sl', y='ma_hang', orientation='h', text_auto='.2s', color_discrete_sequence=[PRIMARY])
-        st.plotly_chart(polish_chart(fig_sku), use_container_width=True)
-    with c2_2:
-        usb_trend = df.groupby(['year', 'is_usb_clean'])['sl'].sum().reset_index()
-        fig_usb = px.bar(usb_trend, x='year', y='sl', color='is_usb_clean', barmode='group',
-                         color_discrete_map={'Có USB': '#FFA726', 'Không USB': '#424242'})
-        st.plotly_chart(polish_chart(fig_usb), use_container_width=True)
-
-# --- TAB 4: MÙA VỤ ---
-with tab4:
-    st.subheader("🌡️ Heatmap Mùa vụ")
-    heat_data = df.groupby(['mua', 'nhom_mau'])['sl'].sum().reset_index()
-    heat_data['share'] = heat_data['sl'] / heat_data.groupby('mua')['sl'].transform('sum')
-    pivot = heat_data.pivot(index='mua', columns='nhom_mau', values='share').fillna(0).reindex(['Xuân', 'Hè', 'Thu', 'Đông'])
-    fig_heat = px.imshow(pivot, text_auto='.0%', aspect="auto", color_continuous_scale='Greens', origin='upper')
-    st.plotly_chart(polish_chart(fig_heat), use_container_width=True)
-
-# --- TAB 5: KHÁCH HÀNG ---
-with tab5:
-    c4_1, c4_2 = st.columns([2, 1])
-    with c4_1:
-        pareto = df.groupby('khach_hang')['sl'].sum().sort_values(ascending=False).reset_index()
-        pareto['cum'] = pareto['sl'].cumsum()
-        pareto['perc'] = pareto['cum'] / pareto['sl'].sum() * 100
-        fig_p = go.Figure()
-        fig_p.add_trace(go.Bar(x=pareto['khach_hang'], y=pareto['sl'], name='Sản lượng', marker_color=PRIMARY))
-        fig_p.add_trace(go.Scatter(x=pareto['khach_hang'], y=pareto['perc'], name='% Tích lũy', yaxis='y2', line=dict(color='#EF5350', width=2)))
-        fig_p.update_layout(yaxis2=dict(overlaying='y', side='right', range=[0, 110]), showlegend=False)
-        st.plotly_chart(polish_chart(fig_p), use_container_width=True)
-    with c4_2:
-        curr_y, prev_y = df['year'].max(), df['year'].max()-1
-        v_c = df[df['year']==curr_y].groupby('khach_hang')['sl'].sum()
-        v_p = df[df['year']==prev_y].groupby('khach_hang')['sl'].sum()
-        growth = ((v_c - v_p)/v_p*100).fillna(0).sort_values(ascending=False).reset_index()
-        growth.columns = ['Khách Hàng', '% Tăng Trưởng']
-        render_dark_aggrid(growth.head(10), height=400)
-
-# --- TAB 6: DỮ LIỆU ---
-with tab6:
-    st.subheader("Tra cứu dữ liệu")
-    grid_df = df.groupby(['ma_hang', 'khach_hang', 'mau_son', 'nhom_mau', 'year']).agg(Tong_SL=('sl', 'sum')).reset_index().sort_values('Tong_SL', ascending=False)
-    render_dark_aggrid(grid_df, height=600)
+with t4:
+    st.subheader("Dữ liệu chi tiết")
+    # Dùng AgGrid cơ bản nhất để tránh lỗi version
+    gd = GridOptionsBuilder.from_dataframe(df.head(100)) # Show 100 dòng đầu để nhẹ
+    gd.configure_pagination()
+    AgGrid(df.head(100), gridOptions=gd.build(), height=400, theme='balham') # Theme balham an toàn hơn
 
 st.markdown("---")
-st.caption(f"© 2026 Mộc Phát Furniture | Premium Neon Edition | Updated: {datetime.now().strftime('%d/%m/%Y')}")
+st.caption(f"Generated at {datetime.now()}")
