@@ -5,6 +5,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 import base64
 import os
+import time # Cần thêm thư viện này để làm hiệu ứng delay
 from datetime import datetime
 from st_aggrid import AgGrid, GridOptionsBuilder
 
@@ -14,11 +15,11 @@ from st_aggrid import AgGrid, GridOptionsBuilder
 st.set_page_config(page_title="Mộc Phát Analytics Pro", layout="wide", page_icon="🌲")
 
 # Bảng màu Neon Dark
-PRIMARY = "#066839"    # Xanh Mộc Phát gốc
-NEON_GREEN = "#00E676" # Xanh Neon phát sáng
-ACCENT  = "#66BB6A"    # Xanh lá sáng
-BG_COLOR = "#050505"   # Đen sâu thẳm
-CARD_BG = "#121212"    # Nền card tối
+PRIMARY = "#066839"    
+NEON_GREEN = "#00E676" 
+ACCENT  = "#66BB6A"    
+BG_COLOR = "#050505"   
+CARD_BG = "#121212"    
 TEXT_MAIN = "#E0E0E0"
 TEXT_SUB = "#9E9E9E"
 GRID_COLOR = "#2A2A2A"
@@ -47,15 +48,37 @@ def polish_chart(fig):
     fig.update_yaxes(showgrid=True, gridcolor=GRID_COLOR, zerolinecolor=GRID_COLOR)
     return fig
 
-# --- CSS HIỆU ỨNG ĐẶC BIỆT (HOVER GLOW) ---
+# --- CSS HIỆU ỨNG ĐẶC BIỆT & INTRO ANIMATION ---
 st.markdown(f"""
 <style>
-    /* 1. Nền & Chữ */
-    .stApp {{ background-color: {BG_COLOR}; }}
+    /* 1. KEYFRAMES ANIMATION */
+    @keyframes fadeInUp {{
+        from {{ opacity: 0; transform: translate3d(0, 40px, 0); }}
+        to {{ opacity: 1; transform: translate3d(0, 0, 0); }}
+    }}
+    
+    @keyframes pulse-glow {{
+        0% {{ box-shadow: 0 0 0 0 rgba(0, 230, 118, 0.4); }}
+        70% {{ box-shadow: 0 0 0 20px rgba(0, 230, 118, 0); }}
+        100% {{ box-shadow: 0 0 0 0 rgba(0, 230, 118, 0); }}
+    }}
+
+    @keyframes loading-bar {{
+        0% {{ width: 0%; }}
+        100% {{ width: 100%; }}
+    }}
+
+    /* 2. Áp dụng hiệu ứng xuất hiện cho toàn bộ App */
+    .stApp {{ 
+        background-color: {BG_COLOR}; 
+        animation: fadeInUp 0.8s ease-out; /* Dashboard trượt lên nhẹ nhàng */
+    }}
+
+    /* 3. Typography & Elements */
     h1, h2, h3, h4 {{ color: {TEXT_MAIN} !important; font-family: 'Segoe UI', sans-serif; }}
     .stMarkdown p, .stMarkdown li {{ color: {TEXT_SUB} !important; }}
     
-    /* 2. Header Sticky Glowing */
+    /* 4. Header Sticky Glowing */
     .header-sticky {{
         position: sticky; top: 15px; z-index: 999;
         background: rgba(18, 18, 18, 0.95);
@@ -70,78 +93,55 @@ st.markdown(f"""
     }}
     .header-sticky:hover {{
         border-bottom: 2px solid {NEON_GREEN};
-        box-shadow: 0 0 20px rgba(0, 230, 118, 0.3); /* Glow Header */
+        box-shadow: 0 0 25px rgba(0, 230, 118, 0.4);
     }}
     .app-title {{ font-size: 26px; font-weight: 800; color: {ACCENT}; margin: 0; }}
 
-    /* 3. KPI Cards - HIỆU ỨNG HOVER NỔI BẬT */
+    /* 5. KPI Cards - Float & Glow */
     .kpi-card {{
         background: {CARD_BG}; 
         border-radius: 16px;
         padding: 20px;
         border-left: 5px solid {PRIMARY};
         border-top: 1px solid rgba(255,255,255,0.05);
-        border-right: 1px solid rgba(255,255,255,0.05);
-        border-bottom: 1px solid rgba(255,255,255,0.05);
         box-shadow: 0 4px 10px rgba(0,0,0,0.4);
-        transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1); /* Chuyển động mượt */
-        cursor: default;
+        transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
     }}
-    
-    /* --> KHI DI CHUỘT VÀO CARD <-- */
     .kpi-card:hover {{
-        transform: translateY(-8px) scale(1.02); /* Nổi lên & phóng to nhẹ */
-        box-shadow: 0 10px 30px rgba(0, 230, 118, 0.25); /* Ánh sáng xanh Neon tỏa ra */
-        border-left: 5px solid {NEON_GREEN}; /* Viền trái sáng rực */
-        border-top: 1px solid rgba(0, 230, 118, 0.3);
+        transform: translateY(-10px);
+        border-left: 5px solid {NEON_GREEN};
+        box-shadow: 0 15px 35px rgba(0, 230, 118, 0.2);
     }}
-    
     .kpi-val {{ font-size: 28px; font-weight: 800; color: {TEXT_MAIN}; transition: color 0.3s; }}
-    .kpi-card:hover .kpi-val {{ color: {NEON_GREEN}; }} /* Số đổi màu khi hover */
-    
-    /* 4. Insight Box Animation */
-    @keyframes pulse {{
-        0% {{ box-shadow: 0 0 0 0 rgba(102, 187, 106, 0.4); }}
-        70% {{ box-shadow: 0 0 0 10px rgba(102, 187, 106, 0); }}
-        100% {{ box-shadow: 0 0 0 0 rgba(102, 187, 106, 0); }}
-    }}
+    .kpi-card:hover .kpi-val {{ color: {NEON_GREEN}; }}
+
+    /* 6. Insight Box */
     .insight-box {{
         background: linear-gradient(135deg, rgba(6, 104, 57, 0.3), rgba(0,0,0,0)); 
         border: 1px solid {PRIMARY};
         padding: 15px; border-radius: 12px; margin-bottom: 20px;
-        animation: pulse 2s infinite; /* Hiệu ứng nhịp đập nhẹ */
+        animation: pulse-glow 3s infinite;
     }}
+    
+    /* 7. Forecast Box */
     .forecast-box {{
         background: linear-gradient(135deg, rgba(255, 167, 38, 0.15), rgba(0,0,0,0));
         border: 1px solid #FFA726;
         padding: 15px; border-radius: 12px; margin-bottom: 20px;
         transition: transform 0.3s;
     }}
-    .forecast-box:hover {{ transform: scale(1.01); box-shadow: 0 5px 15px rgba(255, 167, 38, 0.2); }}
+    .forecast-box:hover {{ transform: scale(1.02); box-shadow: 0 0 20px rgba(255, 167, 38, 0.3); }}
 
-    /* 5. Chart Containers Hover Effect */
-    .stPlotlyChart {{
-        border-radius: 12px;
-        transition: all 0.3s ease;
-        padding: 10px;
-        border: 1px solid transparent;
-    }}
-    .stPlotlyChart:hover {{
-        background-color: rgba(255,255,255,0.03);
-        border: 1px solid rgba(255,255,255,0.1);
-        box-shadow: 0 4px 15px rgba(0,0,0,0.5);
-    }}
-
-    /* 6. Tabs Styling */
+    /* 8. Tabs */
     .stTabs [data-baseweb="tab-list"] {{ gap: 8px; }}
     .stTabs [data-baseweb="tab"] {{ 
         background-color: {CARD_BG}; color: {TEXT_SUB}; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05);
         transition: all 0.3s;
     }}
     .stTabs [data-baseweb="tab"]:hover {{ color: {NEON_GREEN}; border-color: {NEON_GREEN}; }}
-    .stTabs [aria-selected="true"] {{ background-color: {PRIMARY}; color: white; border: none; box-shadow: 0 0 10px rgba(6,104,57,0.5); }}
+    .stTabs [aria-selected="true"] {{ background-color: {PRIMARY}; color: white; border: none; box-shadow: 0 0 15px rgba(6,104,57,0.6); }}
 
-    /* 7. AG-GRID Dark Theme & Hover */
+    /* 9. AG-GRID */
     .ag-theme-alpine-dark {{
         --ag-background-color: {CARD_BG} !important;
         --ag-header-background-color: #161616 !important;
@@ -149,7 +149,7 @@ st.markdown(f"""
         --ag-foreground-color: {TEXT_SUB} !important;
         --ag-border-color: rgba(255,255,255,0.1) !important;
         --ag-header-foreground-color: {ACCENT} !important;
-        --ag-row-hover-color: rgba(6, 104, 57, 0.3) !important; /* Màu hover dòng xanh lá */
+        --ag-row-hover-color: rgba(6, 104, 57, 0.3) !important;
         font-family: 'Segoe UI' !important;
     }}
     .stAgGrid {{
@@ -158,36 +158,67 @@ st.markdown(f"""
         box-shadow: 0 4px 10px rgba(0,0,0,0.3);
         transition: box-shadow 0.3s;
     }}
-    .stAgGrid:hover {{ box-shadow: 0 0 15px rgba(0, 230, 118, 0.15); }}
+    .stAgGrid:hover {{ box-shadow: 0 0 20px rgba(0, 230, 118, 0.15); }}
 </style>
 """, unsafe_allow_html=True)
 
-# Header
-logo_b64 = get_base64_logo("mocphat_logo.png")
-logo_img = f'<img src="data:image/png;base64,{logo_b64}" height="50">' if logo_b64 else "🌲"
-st.markdown(f"""
-<div class="header-sticky">
-    <div style="display:flex; gap:15px; align-items:center;">
-        {logo_img}
-        <div>
-            <div class="app-title">MỘC PHÁT INTELLIGENCE</div>
-            <div style="font-size:13px; color:{TEXT_SUB};">Premium Dark Edition</div>
+# ==========================================
+# 2. XỬ LÝ INTRO ANIMATION (SPLASH SCREEN)
+# ==========================================
+def run_intro_animation():
+    # Placeholder chiếm toàn màn hình
+    intro_holder = st.empty()
+    
+    # CSS cho Splash Screen
+    splash_style = f"""
+    <style>
+        .splash-container {{
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background-color: {BG_COLOR};
+            z-index: 999999;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            color: {NEON_GREEN}; font-family: 'Segoe UI', sans-serif;
+        }}
+        .splash-logo {{ width: 150px; margin-bottom: 30px; filter: drop-shadow(0 0 15px {PRIMARY}); animation: pulse-logo 1.5s infinite alternate; }}
+        @keyframes pulse-logo {{ from {{ transform: scale(1); opacity: 0.8; }} to {{ transform: scale(1.1); opacity: 1; }} }}
+        .loader-bar {{ width: 300px; height: 4px; background: #333; border-radius: 2px; overflow: hidden; margin-top: 20px; }}
+        .loader-fill {{ height: 100%; background: {NEON_GREEN}; width: 0%; animation: loading-bar 2.5s ease-in-out forwards; box-shadow: 0 0 15px {NEON_GREEN}; }}
+        .loading-text {{ margin-top: 15px; font-size: 14px; letter-spacing: 3px; color: {TEXT_SUB}; text-transform: uppercase; }}
+    </style>
+    """
+    
+    logo_b64 = get_base64_logo("mocphat_logo.png")
+    logo_html = f'<img src="data:image/png;base64,{logo_b64}" class="splash-logo">' if logo_b64 else f'<h1 style="font-size:60px; color:{NEON_GREEN}">MỘC PHÁT</h1>'
+
+    # Render Splash
+    intro_holder.markdown(f"""
+        {splash_style}
+        <div class="splash-container">
+            {logo_html}
+            <div style="font-size: 24px; font-weight: 800; letter-spacing: 2px;">MỘC PHÁT INTELLIGENCE</div>
+            <div class="loader-bar"><div class="loader-fill"></div></div>
+            <div class="loading-text">Initializing System Data...</div>
         </div>
-    </div>
-    <div style="text-align:right;">
-        <span style="font-weight:bold; color:{ACCENT}; font-size:14px; text-shadow: 0 0 10px rgba(102,187,106,0.5);">Master 2023-2025</span>
-    </div>
-</div>
-""", unsafe_allow_html=True)
+    """, unsafe_allow_html=True)
+    
+    # Delay giả lập (2.5 giây) để chạy animation
+    time.sleep(2.5)
+    
+    # Xóa Splash Screen
+    intro_holder.empty()
+
+# Kiểm tra Session State để chỉ chạy Intro 1 lần
+if 'intro_shown' not in st.session_state:
+    run_intro_animation()
+    st.session_state['intro_shown'] = True
 
 # ==========================================
-# 2. LOAD DATA
+# 3. LOAD DATA
 # ==========================================
 @st.cache_data(ttl=3600)
 def load_data():
     FILE_NAME = "Master_2023_2025_PRO_clean.xlsx"
     if not os.path.exists(FILE_NAME): return None, f"⚠️ Không tìm thấy file {FILE_NAME}"
-
     try:
         df = pd.read_excel(FILE_NAME, engine='openpyxl')
         df.columns = [str(c).strip().lower() for c in df.columns]
@@ -205,7 +236,6 @@ def load_data():
         for c in cols_text:
             if c not in df.columns: df[c] = "Unknown"
             else: df[c] = df[c].fillna("Unknown").astype(str).str.upper()
-            
         df['sl'] = pd.to_numeric(df['sl'], errors='coerce').fillna(0)
 
         def categorize_detailed_color(v):
@@ -221,7 +251,6 @@ def load_data():
         
         df['nhom_mau'] = df['mau_son'].apply(categorize_detailed_color)
         df['is_usb_clean'] = df['is_usb'].astype(str).apply(lambda x: 'Có USB' if 'true' in x.lower() else 'Không USB') if 'is_usb' in df.columns else 'N/A'
-
         return df, None
     except Exception as e:
         return None, str(e)
@@ -230,8 +259,25 @@ df_raw, error = load_data()
 if error: st.error(error); st.stop()
 
 # ==========================================
-# 3. SIDEBAR
+# 4. HEADER & SIDEBAR
 # ==========================================
+logo_b64 = get_base64_logo("mocphat_logo.png")
+logo_img = f'<img src="data:image/png;base64,{logo_b64}" height="50">' if logo_b64 else "🌲"
+st.markdown(f"""
+<div class="header-sticky">
+    <div style="display:flex; gap:15px; align-items:center;">
+        {logo_img}
+        <div>
+            <div class="app-title">MỘC PHÁT INTELLIGENCE</div>
+            <div style="font-size:13px; color:{TEXT_SUB};">System Ready • Real-time Analytics</div>
+        </div>
+    </div>
+    <div style="text-align:right;">
+        <span style="font-weight:bold; color:{ACCENT}; font-size:14px; text-shadow: 0 0 10px rgba(102,187,106,0.5);">Master 2023-2025</span>
+    </div>
+</div>
+""", unsafe_allow_html=True)
+
 st.sidebar.markdown("### 🎯 BỘ LỌC")
 years = sorted(df_raw['year'].unique(), reverse=True)
 sel_years = st.sidebar.multiselect("Năm", years, default=years)
@@ -243,7 +289,7 @@ if sel_cust: df = df[df['khach_hang'].isin(sel_cust)]
 if df.empty: st.warning("Không có dữ liệu!"); st.stop()
 
 # ==========================================
-# 4. KPI CARDS (GLOW EFFECT)
+# 5. KPI CARDS
 # ==========================================
 st.subheader("🚀 HIỆU QUẢ KINH DOANH")
 vol_by_year = df.groupby('year')['sl'].sum()
@@ -252,9 +298,8 @@ v23 = vol_by_year.get(2023, 0)
 g24 = ((v24 - v23) / v23 * 100) if v23 > 0 else 0
 
 c1, c2, c3, c4 = st.columns(4)
-
 def kpi_card(col, year_label, val, growth_val, compare_label="so với năm trước"):
-    color_class = "#66BB6A" if growth_val >= 0 else "#EF5350"
+    color_class = NEON_GREEN if growth_val >= 0 else "#EF5350"
     icon = "▲" if growth_val >= 0 else "▼"
     col.markdown(f"""
     <div class="kpi-card">
@@ -274,7 +319,7 @@ kpi_card(c4, "KHÁCH HÀNG ACTIVE", df['khach_hang'].nunique(), 0, "Đối tác"
 st.markdown("---")
 
 # ==========================================
-# 5. TABS PHÂN TÍCH
+# 6. TABS PHÂN TÍCH
 # ==========================================
 tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
     "📊 TỔNG QUAN", "🎯 KẾ HOẠCH 2026", "🎨 SỨC KHỎE SP", "🌡️ MÙA VỤ", "⚖️ KHÁCH HÀNG", "📋 DỮ LIỆU"
@@ -296,28 +341,23 @@ with tab1:
     with c1_left:
         st.subheader("📈 Xu hướng & Phát hiện Bất thường")
         ts_data = df.groupby('ym')['sl'].sum().reset_index().sort_values('ym')
-        
         fig = go.Figure()
         fig.add_trace(go.Scatter(x=ts_data['ym'], y=ts_data['sl'], mode='lines+markers', name='Thực tế', 
                                  line=dict(color=NEON_GREEN, width=3, shape='spline'),
                                  fill='tozeroy', fillcolor='rgba(0, 230, 118, 0.1)')) 
-        
         ts_data['ma3'] = ts_data['sl'].rolling(window=3).mean()
         fig.add_trace(go.Scatter(x=ts_data['ym'], y=ts_data['ma3'], mode='lines', name='TB 3 tháng', line=dict(color='#FFA726', dash='dot')))
-        
         std = ts_data['sl'].rolling(window=3).std()
         upper = ts_data['ma3'] + (1.8 * std)
         anomalies = ts_data[ts_data['sl'] > upper]
         if not anomalies.empty:
             fig.add_trace(go.Scatter(x=anomalies['ym'], y=anomalies['sl'], mode='markers', name='Đột biến', marker=dict(color='#EF5350', size=12, symbol='star')))
-            
         st.plotly_chart(polish_chart(fig), use_container_width=True)
 
     with c1_right:
         last_m = ts_data.iloc[-1]
         prev_m = ts_data.iloc[-2] if len(ts_data) > 1 else last_m
         mom = ((last_m['sl'] - prev_m['sl'])/prev_m['sl']*100) if prev_m['sl']>0 else 0
-        
         st.markdown(f"""
         <div class="insight-box">
             <div class="insight-title">🤖 AI Phân tích nhanh:</div>
@@ -361,7 +401,6 @@ with tab2:
         monthly_2026['Type'] = 'Mục tiêu 2026'
         monthly_2025['Type'] = 'Thực tế 2025'
         combined_forecast = pd.concat([monthly_2025, monthly_2026])
-        
         fig_forecast = px.line(combined_forecast, x='month', y='sl', color='Type', markers=True, 
                                color_discrete_map={'Thực tế 2025': '#757575', 'Mục tiêu 2026': NEON_GREEN})
         fig_forecast.update_traces(line=dict(width=3))
@@ -385,21 +424,17 @@ with tab2:
 with tab3:
     st.subheader("🎨 Sunburst Chart")
     col_detail_1, col_detail_2 = st.columns([2, 1])
-    
     with col_detail_1:
         color_data = df.groupby(['nhom_mau', 'mau_son'])['sl'].sum().reset_index()
         total_sl_color = color_data['sl'].sum()
         color_data = color_data[color_data['sl'] > (total_sl_color * 0.005)]
-        fig_sun = px.sunburst(
-            color_data, path=['nhom_mau', 'mau_son'], values='sl', color='nhom_mau',
-            color_discrete_map={"NÂU/GỖ": "#8D6E63", "TRẮNG/KEM": "#FFF9C4", "ĐEN/TỐI": "#424242", "XÁM": "#90A4AE", "TỰ NHIÊN": "#FFCC80"}
-        )
+        fig_sun = px.sunburst(color_data, path=['nhom_mau', 'mau_son'], values='sl', color='nhom_mau',
+            color_discrete_map={"NÂU/GỖ": "#8D6E63", "TRẮNG/KEM": "#FFF9C4", "ĐEN/TỐI": "#424242", "XÁM": "#90A4AE", "TỰ NHIÊN": "#FFCC80"})
         st.plotly_chart(polish_chart(fig_sun), use_container_width=True)
     with col_detail_2:
         top_colors = df.groupby('mau_son')['sl'].sum().nlargest(10).sort_values(ascending=True).reset_index()
         fig_bar_col = px.bar(top_colors, x='sl', y='mau_son', orientation='h', text_auto='.2s', color='sl', color_continuous_scale='Greens')
         st.plotly_chart(polish_chart(fig_bar_col), use_container_width=True)
-
     c2_1, c2_2 = st.columns(2)
     with c2_1:
         top_sku = df.groupby('ma_hang')['sl'].sum().nlargest(10).sort_values(ascending=True).reset_index()
