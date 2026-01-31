@@ -6,21 +6,21 @@ import plotly.graph_objects as go
 import base64
 import os
 from datetime import datetime
-from st_aggrid import AgGrid, GridOptionsBuilder
+from st_aggrid import AgGrid, GridOptionsBuilder, JsCode
 
 # ==========================================
-# 1. CẤU HÌNH GIAO DIỆN (DARK MODE PERFECT)
+# 1. CẤU HÌNH GIAO DIỆN (DARK MODE ABSOLUTE)
 # ==========================================
 st.set_page_config(page_title="Mộc Phát Analytics Pro", layout="wide", page_icon="🌲")
 
 # Bảng màu Dark Mode Chuẩn
 PRIMARY = "#066839"    # Xanh Mộc Phát
 ACCENT  = "#66BB6A"    # Xanh lá sáng (Neon nhẹ)
-BG_COLOR = "#0E1117"   # Nền đen sâu
-CARD_BG = "#1E1E1E"    # Nền card xám đen
-TEXT_MAIN = "#FAFAFA"  # Trắng
-TEXT_SUB = "#B0BEC5"   # Xám xanh nhạt
-GRID_COLOR = "#2A2A2A" # Màu đường kẻ lưới tối
+BG_COLOR = "#0E1117"   # Nền đen sâu (Background App)
+CARD_BG = "#1E1E1E"    # Nền card (Surface)
+TEXT_MAIN = "#E0E0E0"  # Trắng ngà (đỡ mỏi mắt hơn trắng tinh)
+TEXT_SUB = "#9E9E9E"   # Xám
+GRID_COLOR = "#333333" # Màu lưới biểu đồ
 
 def get_base64_logo(path):
     if os.path.exists(path):
@@ -31,87 +31,91 @@ def get_base64_logo(path):
 def fmt_num(n):
     return f"{n:,.0f}"
 
-# --- HÀM LÀM ĐẸP BIỂU ĐỒ (QUAN TRỌNG) ---
+# --- HÀM STYLE BIỂU ĐỒ ---
 def polish_chart(fig):
-    """Hàm này xóa nền trắng, bo tròn viền và làm mềm biểu đồ"""
+    """Xóa nền trắng, bo viền ảo, chỉnh màu chữ"""
     fig.update_layout(
         template="plotly_dark",
-        paper_bgcolor='rgba(0,0,0,0)', # Nền trong suốt
-        plot_bgcolor='rgba(0,0,0,0)',  # Nền vùng vẽ trong suốt
+        paper_bgcolor='rgba(0,0,0,0)', 
+        plot_bgcolor='rgba(0,0,0,0)',
         font=dict(color=TEXT_SUB, family="Segoe UI"),
-        margin=dict(t=40, b=20, l=20, r=20),
+        margin=dict(t=40, b=20, l=10, r=10),
         hovermode="x unified",
-        # Hiệu ứng bo tròn cột (Fake bằng marker line)
-        barcornerradius=0 # Plotly chưa hỗ trợ border-radius trực tiếp cho Bar, ta xử lý bằng layout
+        barcornerradius=4 # Bo góc cột biểu đồ (Mới hỗ trợ trên bản Plotly mới)
     )
-    # Tinh chỉnh trục
-    fig.update_xaxes(showgrid=False, linecolor='#333')
-    fig.update_yaxes(showgrid=True, gridcolor=GRID_COLOR, zerolinecolor=GRID_COLOR)
+    fig.update_xaxes(showgrid=False, color=TEXT_SUB, linecolor=GRID_COLOR)
+    fig.update_yaxes(showgrid=True, gridcolor=GRID_COLOR, zerolinecolor=GRID_COLOR, color=TEXT_SUB)
     return fig
 
-# --- CSS CAO CẤP ---
+# --- CSS CAO CẤP (ĐỒNG BỘ TABLE & CHART) ---
 st.markdown(f"""
 <style>
-    /* Nền chính */
+    /* 1. Nền & Chữ */
     .stApp {{ background-color: {BG_COLOR}; }}
-    
-    /* Chữ */
     h1, h2, h3, h4 {{ color: {TEXT_MAIN} !important; font-family: 'Segoe UI', sans-serif; }}
-    .stMarkdown p {{ color: {TEXT_SUB} !important; }}
+    .stMarkdown p, .stMarkdown li {{ color: {TEXT_SUB} !important; }}
     
-    /* Header Sticky Bo Tròn */
+    /* 2. Header Sticky Bo Tròn */
     .header-sticky {{
-        position: sticky; top: 10px; z-index: 999;
+        position: sticky; top: 15px; z-index: 999;
         background: {CARD_BG}; 
         border-bottom: 2px solid {PRIMARY};
-        padding: 15px 20px; 
-        margin: -50px 0px 20px 0px;
-        border-radius: 15px; /* Bo góc header */
+        padding: 15px 25px; 
+        margin: -50px 0px 25px 0px;
+        border-radius: 16px;
         display: flex; align-items: center; justify-content: space-between;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+        box-shadow: 0 8px 20px rgba(0,0,0,0.6);
+        border: 1px solid rgba(255,255,255,0.05);
     }}
-    .app-title {{ font-size: 24px; font-weight: 800; color: {ACCENT}; margin: 0; }}
-    
-    /* KPI Cards Bo Tròn & Nổi */
+    .app-title {{ font-size: 26px; font-weight: 800; color: {ACCENT}; margin: 0; }}
+
+    /* 3. KPI Cards */
     .kpi-card {{
         background: {CARD_BG}; 
-        border-radius: 15px; /* Bo tròn card */
+        border-radius: 16px;
         padding: 20px;
         border-left: 5px solid {PRIMARY};
         box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-        transition: transform 0.2s;
+        border: 1px solid rgba(255,255,255,0.05);
     }}
-    .kpi-card:hover {{ transform: translateY(-5px); box-shadow: 0 6px 15px rgba(6, 104, 57, 0.3); }}
     .kpi-val {{ font-size: 28px; font-weight: 800; color: {TEXT_MAIN}; }}
-    .kpi-lbl {{ font-size: 13px; text-transform: uppercase; color: {TEXT_SUB}; letter-spacing: 1px; }}
     
-    /* Insight Box */
+    /* 4. Insight & Forecast Box */
     .insight-box {{
-        background-color: rgba(6, 104, 57, 0.15); 
+        background-color: rgba(6, 104, 57, 0.2); 
         border: 1px solid {PRIMARY};
         padding: 15px; border-radius: 12px; margin-bottom: 20px;
     }}
-    
-    /* Forecast Box */
     .forecast-box {{
-        background: linear-gradient(135deg, rgba(255, 167, 38, 0.1), rgba(0,0,0,0));
+        background: linear-gradient(135deg, rgba(255, 167, 38, 0.15), rgba(0,0,0,0));
         border: 1px solid #FFA726;
         padding: 15px; border-radius: 12px; margin-bottom: 20px;
     }}
     
-    /* Tabs */
+    /* 5. Tabs Styling */
     .stTabs [data-baseweb="tab-list"] {{ gap: 8px; }}
     .stTabs [data-baseweb="tab"] {{ 
-        background-color: {CARD_BG}; color: {TEXT_SUB}; border-radius: 8px; border: none;
+        background-color: {CARD_BG}; color: {TEXT_SUB}; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05);
     }}
-    .stTabs [aria-selected="true"] {{ background-color: {PRIMARY}; color: white; font-weight: bold; }}
-    
-    /* Container cho biểu đồ để tạo hiệu ứng bo tròn nền */
-    .chart-container {{
-        background-color: {CARD_BG};
-        border-radius: 15px;
-        padding: 10px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+    .stTabs [aria-selected="true"] {{ background-color: {PRIMARY}; color: white; border: none; }}
+
+    /* 6. AG-GRID CUSTOMIZATION (QUAN TRỌNG: ĐỒNG BỘ MÀU) */
+    /* Ép màu nền AgGrid về trùng màu Card */
+    .ag-theme-alpine-dark {{
+        --ag-background-color: {CARD_BG} !important;
+        --ag-header-background-color: #161616 !important;
+        --ag-odd-row-background-color: {CARD_BG} !important;
+        --ag-foreground-color: {TEXT_SUB} !important;
+        --ag-border-color: rgba(255,255,255,0.1) !important;
+        --ag-header-foreground-color: {ACCENT} !important;
+        font-family: 'Segoe UI' !important;
+    }}
+    /* Bo tròn khung AgGrid */
+    .stAgGrid {{
+        border-radius: 12px;
+        overflow: hidden;
+        border: 1px solid rgba(255,255,255,0.05);
+        box-shadow: 0 4px 10px rgba(0,0,0,0.3);
     }}
 </style>
 """, unsafe_allow_html=True)
@@ -125,7 +129,7 @@ st.markdown(f"""
         {logo_img}
         <div>
             <div class="app-title">MỘC PHÁT INTELLIGENCE</div>
-            <div style="font-size:13px; color:{TEXT_SUB};">Dark Mode Analytics v5.0</div>
+            <div style="font-size:13px; color:{TEXT_SUB};">Dark Mode • Seamless Design</div>
         </div>
     </div>
     <div style="text-align:right;">
@@ -135,7 +139,7 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 2. XỬ LÝ DỮ LIỆU
+# 2. LOAD DATA
 # ==========================================
 @st.cache_data(ttl=3600)
 def load_data():
@@ -220,9 +224,9 @@ def kpi_card(col, year_label, val, growth_val, compare_label="so với năm trư
     </div>
     """, unsafe_allow_html=True)
 
-kpi_card(c1, "SẢN LƯỢNG 2023", v23, 0, "(Năm gốc)")
+kpi_card(c1, "SẢN LƯỢNG 2023", v23, 0, "(Base Year)")
 kpi_card(c2, "SẢN LƯỢNG 2024", v24, g24, "vs 2023")
-kpi_card(c3, "SẢN LƯỢNG 2025", vol_by_year.get(2025,0), 0, "(Hiện tại)")
+kpi_card(c3, "SẢN LƯỢNG 2025", vol_by_year.get(2025,0), 0, "(Current)")
 kpi_card(c4, "KHÁCH HÀNG ACTIVE", df['khach_hang'].nunique(), 0, "Đối tác")
 
 st.markdown("---")
@@ -234,6 +238,24 @@ tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
     "📊 TỔNG QUAN", "🎯 KẾ HOẠCH 2026", "🎨 SỨC KHỎE SP", "🌡️ MÙA VỤ", "⚖️ KHÁCH HÀNG", "📋 DỮ LIỆU"
 ])
 
+# --- Helper Function tạo AgGrid Dark Mode ---
+def render_dark_aggrid(dataframe, height=400):
+    gb = GridOptionsBuilder.from_dataframe(dataframe)
+    gb.configure_pagination(paginationAutoPageSize=True)
+    gb.configure_selection('multiple', use_checkbox=True)
+    gb.configure_default_column(resizable=True, filterable=True, sortable=True)
+    
+    # Format số cho đẹp
+    for col in dataframe.select_dtypes(include=['number']).columns:
+        gb.configure_column(col, type=["numericColumn", "numberColumnFilter"], precision=0)
+        
+    gridOptions = gb.build()
+    
+    # Quan trọng: Dùng theme alpine-dark để khớp với CSS custom
+    AgGrid(dataframe, gridOptions=gridOptions, height=height, 
+           theme='alpine-dark',  # Theme này sẽ được CSS override ở trên
+           enable_enterprise_modules=False)
+
 # --- TAB 1: TỔNG QUAN ---
 with tab1:
     c1_left, c1_right = st.columns([3, 1])
@@ -242,15 +264,13 @@ with tab1:
         ts_data = df.groupby('ym')['sl'].sum().reset_index().sort_values('ym')
         
         fig = go.Figure()
-        # Area Chart với hiệu ứng gradient nhẹ (giả lập bằng fill)
         fig.add_trace(go.Scatter(x=ts_data['ym'], y=ts_data['sl'], mode='lines+markers', name='Thực tế', 
-                                 line=dict(color=ACCENT, width=3, shape='spline'), # shape='spline' làm đường cong mềm hơn
+                                 line=dict(color=ACCENT, width=3, shape='spline'),
                                  fill='tozeroy', fillcolor='rgba(102, 187, 106, 0.1)')) 
         
         ts_data['ma3'] = ts_data['sl'].rolling(window=3).mean()
         fig.add_trace(go.Scatter(x=ts_data['ym'], y=ts_data['ma3'], mode='lines', name='TB 3 tháng', line=dict(color='#FFA726', dash='dot')))
         
-        # Anomaly
         std = ts_data['sl'].rolling(window=3).std()
         upper = ts_data['ma3'] + (1.8 * std)
         anomalies = ts_data[ts_data['sl'] > upper]
@@ -381,21 +401,20 @@ with tab5:
         fig_p.update_layout(yaxis2=dict(overlaying='y', side='right', range=[0, 110]), showlegend=False)
         st.plotly_chart(polish_chart(fig_p), use_container_width=True)
     with c4_2:
+        # Thay thế bảng dataframe bằng AgGrid nhỏ cho đồng bộ
         curr_y, prev_y = df['year'].max(), df['year'].max()-1
         v_c = df[df['year']==curr_y].groupby('khach_hang')['sl'].sum()
         v_p = df[df['year']==prev_y].groupby('khach_hang')['sl'].sum()
-        growth = ((v_c - v_p)/v_p*100).fillna(0).sort_values(ascending=False)
-        st.dataframe(growth.head(10).rename("% Growth"), height=400)
+        growth = ((v_c - v_p)/v_p*100).fillna(0).sort_values(ascending=False).reset_index()
+        growth.columns = ['Khách Hàng', '% Tăng Trưởng']
+        render_dark_aggrid(growth.head(10), height=400)
 
 # --- TAB 6: DỮ LIỆU ---
 with tab6:
     st.subheader("Tra cứu dữ liệu")
     grid_df = df.groupby(['ma_hang', 'khach_hang', 'mau_son', 'nhom_mau', 'year']).agg(Tong_SL=('sl', 'sum')).reset_index().sort_values('Tong_SL', ascending=False)
-    gb = GridOptionsBuilder.from_dataframe(grid_df)
-    gb.configure_pagination(paginationAutoPageSize=True)
-    gb.configure_selection('multiple', use_checkbox=True)
-    gb.configure_column("Tong_SL", type=["numericColumn", "numberColumnFilter"], precision=0)
-    AgGrid(grid_df, gridOptions=gb.build(), height=600, theme='balham-dark')
+    # Dùng hàm render dark mode chuẩn
+    render_dark_aggrid(grid_df, height=600)
 
 st.markdown("---")
-st.caption(f"© 2026 Mộc Phát Furniture | Dark Mode Perfect | Updated: {datetime.now().strftime('%d/%m/%Y')}")
+st.caption(f"© 2026 Mộc Phát Furniture | Dark Mode Absolute | Updated: {datetime.now().strftime('%d/%m/%Y')}")
