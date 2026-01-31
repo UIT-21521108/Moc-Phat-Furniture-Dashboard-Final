@@ -5,7 +5,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 import base64
 import os
-import time # Cần thêm thư viện này để làm hiệu ứng delay
+import time
 from datetime import datetime
 from st_aggrid import AgGrid, GridOptionsBuilder
 
@@ -25,6 +25,7 @@ TEXT_SUB = "#9E9E9E"
 GRID_COLOR = "#2A2A2A"
 
 def get_base64_logo(path):
+    # Kiểm tra path an toàn để tránh lỗi trên server
     if os.path.exists(path):
         with open(path, "rb") as f:
             return base64.b64encode(f.read()).decode()
@@ -41,14 +42,14 @@ def polish_chart(fig):
         plot_bgcolor='rgba(0,0,0,0)',
         font=dict(color=TEXT_SUB, family="Segoe UI"),
         margin=dict(t=40, b=20, l=10, r=10),
-        hovermode="x unified",
-        barcornerradius=4
+        hovermode="x unified"
     )
     fig.update_xaxes(showgrid=False, linecolor=GRID_COLOR)
     fig.update_yaxes(showgrid=True, gridcolor=GRID_COLOR, zerolinecolor=GRID_COLOR)
     return fig
 
 # --- CSS HIỆU ỨNG ĐẶC BIỆT & INTRO ANIMATION ---
+# LƯU Ý QUAN TRỌNG: Trong Python f-string, dấu { của CSS phải viết là {{
 st.markdown(f"""
 <style>
     /* 1. KEYFRAMES ANIMATION */
@@ -71,7 +72,7 @@ st.markdown(f"""
     /* 2. Áp dụng hiệu ứng xuất hiện cho toàn bộ App */
     .stApp {{ 
         background-color: {BG_COLOR}; 
-        animation: fadeInUp 0.8s ease-out; /* Dashboard trượt lên nhẹ nhàng */
+        animation: fadeInUp 0.8s ease-out;
     }}
 
     /* 3. Typography & Elements */
@@ -163,14 +164,13 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 2. XỬ LÝ INTRO ANIMATION (SPLASH SCREEN)
+# 2. XỬ LÝ INTRO ANIMATION
 # ==========================================
 def run_intro_animation():
-    # Placeholder chiếm toàn màn hình
     intro_holder = st.empty()
     
-    # CSS cho Splash Screen
-    splash_style = f"""
+    # CSS riêng cho Splash (Không dùng f-string để tránh rối cú pháp)
+    splash_css = f"""
     <style>
         .splash-container {{
             position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
@@ -188,41 +188,42 @@ def run_intro_animation():
     """
     
     logo_b64 = get_base64_logo("mocphat_logo.png")
-    logo_html = f'<img src="data:image/png;base64,{logo_b64}" class="splash-logo">' if logo_b64 else f'<h1 style="font-size:60px; color:{NEON_GREEN}">MỘC PHÁT</h1>'
+    logo_html = f'<img src="data:image/png;base64,{logo_b64}" class="splash-logo">' if logo_b64 else f'<h1 style="font-size:60px; color:{NEON_GREEN}">🌲</h1>'
 
-    # Render Splash
     intro_holder.markdown(f"""
-        {splash_style}
+        {splash_css}
         <div class="splash-container">
             {logo_html}
             <div style="font-size: 24px; font-weight: 800; letter-spacing: 2px;">MỘC PHÁT INTELLIGENCE</div>
             <div class="loader-bar"><div class="loader-fill"></div></div>
-            <div class="loading-text">Initializing System Data...</div>
+            <div class="loading-text">Initializing System...</div>
         </div>
     """, unsafe_allow_html=True)
     
-    # Delay giả lập (2.5 giây) để chạy animation
-    time.sleep(2.5)
-    
-    # Xóa Splash Screen
+    time.sleep(2.5) # Giả lập thời gian load
     intro_holder.empty()
 
-# Kiểm tra Session State để chỉ chạy Intro 1 lần
+# Chỉ chạy Intro khi chưa có trong session_state
 if 'intro_shown' not in st.session_state:
     run_intro_animation()
     st.session_state['intro_shown'] = True
 
 # ==========================================
-# 3. LOAD DATA
+# 3. LOAD DATA (CÓ XỬ LÝ LỖI FILE)
 # ==========================================
 @st.cache_data(ttl=3600)
 def load_data():
     FILE_NAME = "Master_2023_2025_PRO_clean.xlsx"
-    if not os.path.exists(FILE_NAME): return None, f"⚠️ Không tìm thấy file {FILE_NAME}"
+    
+    # Kiểm tra file có tồn tại không
+    if not os.path.exists(FILE_NAME): 
+        return None, f"⚠️ LỖI: Không tìm thấy file '{FILE_NAME}'. Vui lòng Upload file lên GitHub hoặc cùng thư mục."
+    
     try:
         df = pd.read_excel(FILE_NAME, engine='openpyxl')
         df.columns = [str(c).strip().lower() for c in df.columns]
         
+        # Xử lý ngày tháng
         df['year'] = pd.to_numeric(df['year'], errors='coerce').fillna(0).astype(int)
         df['month'] = pd.to_numeric(df['month'], errors='coerce').fillna(0).astype(int)
         df = df[(df['year'] > 2020) & (df['month'].between(1, 12))]
@@ -232,12 +233,14 @@ def load_data():
                       6:'Hè', 7:'Hè', 8:'Hè', 9:'Thu', 10:'Thu', 11:'Thu'}
         df['mua'] = df['month'].map(season_map)
         
+        # Xử lý Text
         cols_text = ['khach_hang', 'ma_hang', 'mau_son', 'khu_vuc', 'dim', 'mo_ta']
         for c in cols_text:
             if c not in df.columns: df[c] = "Unknown"
             else: df[c] = df[c].fillna("Unknown").astype(str).str.upper()
         df['sl'] = pd.to_numeric(df['sl'], errors='coerce').fillna(0)
 
+        # Logic Màu
         def categorize_detailed_color(v):
             v = v.strip()
             if any(x in v for x in ["BROWN", "COCOA", "BRONZE", "UMBER", "NAU", "WALNUT", "ESPRESSO"]): return "NÂU/GỖ"
@@ -249,20 +252,33 @@ def load_data():
             if any(x in v for x in ["GREEN", "SAGE"]): return "XANH LÁ"
             return "MÀU KHÁC"
         
-        df['nhom_mau'] = df['mau_son'].apply(categorize_detailed_color)
-        df['is_usb_clean'] = df['is_usb'].astype(str).apply(lambda x: 'Có USB' if 'true' in x.lower() else 'Không USB') if 'is_usb' in df.columns else 'N/A'
+        if 'mau_son' in df.columns:
+            df['nhom_mau'] = df['mau_son'].apply(categorize_detailed_color)
+        else:
+            df['nhom_mau'] = "N/A"
+
+        if 'is_usb' in df.columns:
+            df['is_usb_clean'] = df['is_usb'].astype(str).apply(lambda x: 'Có USB' if 'true' in x.lower() else 'Không USB')
+        else:
+            df['is_usb_clean'] = 'N/A'
+
         return df, None
     except Exception as e:
-        return None, str(e)
+        return None, f"Lỗi đọc file Excel: {str(e)}"
 
 df_raw, error = load_data()
-if error: st.error(error); st.stop()
+
+# Nếu lỗi file, dừng app và hiện thông báo
+if error:
+    st.error(error)
+    st.stop()
 
 # ==========================================
 # 4. HEADER & SIDEBAR
 # ==========================================
 logo_b64 = get_base64_logo("mocphat_logo.png")
 logo_img = f'<img src="data:image/png;base64,{logo_b64}" height="50">' if logo_b64 else "🌲"
+
 st.markdown(f"""
 <div class="header-sticky">
     <div style="display:flex; gap:15px; align-items:center;">
@@ -325,15 +341,23 @@ tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
     "📊 TỔNG QUAN", "🎯 KẾ HOẠCH 2026", "🎨 SỨC KHỎE SP", "🌡️ MÙA VỤ", "⚖️ KHÁCH HÀNG", "📋 DỮ LIỆU"
 ])
 
+# Hàm Render AgGrid chuẩn (không bị lỗi version)
 def render_dark_aggrid(dataframe, height=400):
     gb = GridOptionsBuilder.from_dataframe(dataframe)
     gb.configure_pagination(paginationAutoPageSize=True)
     gb.configure_selection('multiple', use_checkbox=True)
     gb.configure_default_column(resizable=True, filterable=True, sortable=True)
+    
+    # Format số
     for col in dataframe.select_dtypes(include=['number']).columns:
         gb.configure_column(col, type=["numericColumn", "numberColumnFilter"], precision=0)
+    
     gridOptions = gb.build()
-    AgGrid(dataframe, gridOptions=gridOptions, height=height, theme='alpine-dark', enable_enterprise_modules=False)
+    
+    # Quan trọng: reload_data=False để tránh reload loop
+    AgGrid(dataframe, gridOptions=gridOptions, height=height, 
+           theme='alpine-dark', enable_enterprise_modules=False,
+           allow_unsafe_jscode=True, update_mode='MODEL_CHANGED')
 
 # --- TAB 1: TỔNG QUAN ---
 with tab1:
@@ -355,19 +379,20 @@ with tab1:
         st.plotly_chart(polish_chart(fig), use_container_width=True)
 
     with c1_right:
-        last_m = ts_data.iloc[-1]
-        prev_m = ts_data.iloc[-2] if len(ts_data) > 1 else last_m
-        mom = ((last_m['sl'] - prev_m['sl'])/prev_m['sl']*100) if prev_m['sl']>0 else 0
-        st.markdown(f"""
-        <div class="insight-box">
-            <div class="insight-title">🤖 AI Phân tích nhanh:</div>
-            <ul style="margin:0; padding-left:20px; font-size:14px; color: {TEXT_MAIN}">
-                <li>Tháng <b>{last_m['ym'].strftime('%m/%Y')}</b>: <b>{fmt_num(last_m['sl'])}</b> SP.</li>
-                <li>Biến động: <b style="color:{NEON_GREEN if mom>0 else '#EF5350'}">{mom:+.1f}%</b>.</li>
-                <li>Phát hiện <b>{len(anomalies)}</b> điểm bất thường.</li>
-            </ul>
-        </div>
-        """, unsafe_allow_html=True)
+        if not ts_data.empty:
+            last_m = ts_data.iloc[-1]
+            prev_m = ts_data.iloc[-2] if len(ts_data) > 1 else last_m
+            mom = ((last_m['sl'] - prev_m['sl'])/prev_m['sl']*100) if prev_m['sl']>0 else 0
+            st.markdown(f"""
+            <div class="insight-box">
+                <div class="insight-title">🤖 AI Phân tích nhanh:</div>
+                <ul style="margin:0; padding-left:20px; font-size:14px; color: {TEXT_MAIN}">
+                    <li>Tháng <b>{last_m['ym'].strftime('%m/%Y')}</b>: <b>{fmt_num(last_m['sl'])}</b> SP.</li>
+                    <li>Biến động: <b style="color:{NEON_GREEN if mom>0 else '#EF5350'}">{mom:+.1f}%</b>.</li>
+                    <li>Phát hiện <b>{len(anomalies)}</b> điểm bất thường.</li>
+                </ul>
+            </div>
+            """, unsafe_allow_html=True)
 
 # --- TAB 2: KẾ HOẠCH 2026 ---
 with tab2:
