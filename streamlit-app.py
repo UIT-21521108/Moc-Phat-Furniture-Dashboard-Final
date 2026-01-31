@@ -6,21 +6,22 @@ import plotly.graph_objects as go
 import base64
 import os
 from datetime import datetime
-from st_aggrid import AgGrid, GridOptionsBuilder, JsCode
+from st_aggrid import AgGrid, GridOptionsBuilder
 
 # ==========================================
-# 1. CẤU HÌNH GIAO DIỆN (DARK MODE ABSOLUTE)
+# 1. CẤU HÌNH GIAO DIỆN (PREMIUM NEON DARK)
 # ==========================================
 st.set_page_config(page_title="Mộc Phát Analytics Pro", layout="wide", page_icon="🌲")
 
-# Bảng màu Dark Mode Chuẩn
-PRIMARY = "#066839"    # Xanh Mộc Phát
-ACCENT  = "#66BB6A"    # Xanh lá sáng (Neon nhẹ)
-BG_COLOR = "#0E1117"   # Nền đen sâu (Background App)
-CARD_BG = "#1E1E1E"    # Nền card (Surface)
-TEXT_MAIN = "#E0E0E0"  # Trắng ngà (đỡ mỏi mắt hơn trắng tinh)
-TEXT_SUB = "#9E9E9E"   # Xám
-GRID_COLOR = "#333333" # Màu lưới biểu đồ
+# Bảng màu Neon Dark
+PRIMARY = "#066839"    # Xanh Mộc Phát gốc
+NEON_GREEN = "#00E676" # Xanh Neon phát sáng
+ACCENT  = "#66BB6A"    # Xanh lá sáng
+BG_COLOR = "#050505"   # Đen sâu thẳm
+CARD_BG = "#121212"    # Nền card tối
+TEXT_MAIN = "#E0E0E0"
+TEXT_SUB = "#9E9E9E"
+GRID_COLOR = "#2A2A2A"
 
 def get_base64_logo(path):
     if os.path.exists(path):
@@ -33,7 +34,6 @@ def fmt_num(n):
 
 # --- HÀM STYLE BIỂU ĐỒ ---
 def polish_chart(fig):
-    """Xóa nền trắng, bo viền ảo, chỉnh màu chữ"""
     fig.update_layout(
         template="plotly_dark",
         paper_bgcolor='rgba(0,0,0,0)', 
@@ -41,13 +41,13 @@ def polish_chart(fig):
         font=dict(color=TEXT_SUB, family="Segoe UI"),
         margin=dict(t=40, b=20, l=10, r=10),
         hovermode="x unified",
-        barcornerradius=4 # Bo góc cột biểu đồ (Mới hỗ trợ trên bản Plotly mới)
+        barcornerradius=4
     )
-    fig.update_xaxes(showgrid=False, color=TEXT_SUB, linecolor=GRID_COLOR)
-    fig.update_yaxes(showgrid=True, gridcolor=GRID_COLOR, zerolinecolor=GRID_COLOR, color=TEXT_SUB)
+    fig.update_xaxes(showgrid=False, linecolor=GRID_COLOR)
+    fig.update_yaxes(showgrid=True, gridcolor=GRID_COLOR, zerolinecolor=GRID_COLOR)
     return fig
 
-# --- CSS CAO CẤP (ĐỒNG BỘ TABLE & CHART) ---
+# --- CSS HIỆU ỨNG ĐẶC BIỆT (HOVER GLOW) ---
 st.markdown(f"""
 <style>
     /* 1. Nền & Chữ */
@@ -55,68 +55,110 @@ st.markdown(f"""
     h1, h2, h3, h4 {{ color: {TEXT_MAIN} !important; font-family: 'Segoe UI', sans-serif; }}
     .stMarkdown p, .stMarkdown li {{ color: {TEXT_SUB} !important; }}
     
-    /* 2. Header Sticky Bo Tròn */
+    /* 2. Header Sticky Glowing */
     .header-sticky {{
         position: sticky; top: 15px; z-index: 999;
-        background: {CARD_BG}; 
+        background: rgba(18, 18, 18, 0.95);
+        backdrop-filter: blur(10px);
         border-bottom: 2px solid {PRIMARY};
         padding: 15px 25px; 
         margin: -50px 0px 25px 0px;
         border-radius: 16px;
         display: flex; align-items: center; justify-content: space-between;
-        box-shadow: 0 8px 20px rgba(0,0,0,0.6);
-        border: 1px solid rgba(255,255,255,0.05);
+        box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+        transition: all 0.3s ease;
+    }}
+    .header-sticky:hover {{
+        border-bottom: 2px solid {NEON_GREEN};
+        box-shadow: 0 0 20px rgba(0, 230, 118, 0.3); /* Glow Header */
     }}
     .app-title {{ font-size: 26px; font-weight: 800; color: {ACCENT}; margin: 0; }}
 
-    /* 3. KPI Cards */
+    /* 3. KPI Cards - HIỆU ỨNG HOVER NỔI BẬT */
     .kpi-card {{
         background: {CARD_BG}; 
         border-radius: 16px;
         padding: 20px;
         border-left: 5px solid {PRIMARY};
-        box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-        border: 1px solid rgba(255,255,255,0.05);
+        border-top: 1px solid rgba(255,255,255,0.05);
+        border-right: 1px solid rgba(255,255,255,0.05);
+        border-bottom: 1px solid rgba(255,255,255,0.05);
+        box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+        transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1); /* Chuyển động mượt */
+        cursor: default;
     }}
-    .kpi-val {{ font-size: 28px; font-weight: 800; color: {TEXT_MAIN}; }}
     
-    /* 4. Insight & Forecast Box */
+    /* --> KHI DI CHUỘT VÀO CARD <-- */
+    .kpi-card:hover {{
+        transform: translateY(-8px) scale(1.02); /* Nổi lên & phóng to nhẹ */
+        box-shadow: 0 10px 30px rgba(0, 230, 118, 0.25); /* Ánh sáng xanh Neon tỏa ra */
+        border-left: 5px solid {NEON_GREEN}; /* Viền trái sáng rực */
+        border-top: 1px solid rgba(0, 230, 118, 0.3);
+    }}
+    
+    .kpi-val {{ font-size: 28px; font-weight: 800; color: {TEXT_MAIN}; transition: color 0.3s; }}
+    .kpi-card:hover .kpi-val {{ color: {NEON_GREEN}; }} /* Số đổi màu khi hover */
+    
+    /* 4. Insight Box Animation */
+    @keyframes pulse {{
+        0% {{ box-shadow: 0 0 0 0 rgba(102, 187, 106, 0.4); }}
+        70% {{ box-shadow: 0 0 0 10px rgba(102, 187, 106, 0); }}
+        100% {{ box-shadow: 0 0 0 0 rgba(102, 187, 106, 0); }}
+    }}
     .insight-box {{
-        background-color: rgba(6, 104, 57, 0.2); 
+        background: linear-gradient(135deg, rgba(6, 104, 57, 0.3), rgba(0,0,0,0)); 
         border: 1px solid {PRIMARY};
         padding: 15px; border-radius: 12px; margin-bottom: 20px;
+        animation: pulse 2s infinite; /* Hiệu ứng nhịp đập nhẹ */
     }}
     .forecast-box {{
         background: linear-gradient(135deg, rgba(255, 167, 38, 0.15), rgba(0,0,0,0));
         border: 1px solid #FFA726;
         padding: 15px; border-radius: 12px; margin-bottom: 20px;
+        transition: transform 0.3s;
     }}
-    
-    /* 5. Tabs Styling */
+    .forecast-box:hover {{ transform: scale(1.01); box-shadow: 0 5px 15px rgba(255, 167, 38, 0.2); }}
+
+    /* 5. Chart Containers Hover Effect */
+    .stPlotlyChart {{
+        border-radius: 12px;
+        transition: all 0.3s ease;
+        padding: 10px;
+        border: 1px solid transparent;
+    }}
+    .stPlotlyChart:hover {{
+        background-color: rgba(255,255,255,0.03);
+        border: 1px solid rgba(255,255,255,0.1);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+    }}
+
+    /* 6. Tabs Styling */
     .stTabs [data-baseweb="tab-list"] {{ gap: 8px; }}
     .stTabs [data-baseweb="tab"] {{ 
         background-color: {CARD_BG}; color: {TEXT_SUB}; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05);
+        transition: all 0.3s;
     }}
-    .stTabs [aria-selected="true"] {{ background-color: {PRIMARY}; color: white; border: none; }}
+    .stTabs [data-baseweb="tab"]:hover {{ color: {NEON_GREEN}; border-color: {NEON_GREEN}; }}
+    .stTabs [aria-selected="true"] {{ background-color: {PRIMARY}; color: white; border: none; box-shadow: 0 0 10px rgba(6,104,57,0.5); }}
 
-    /* 6. AG-GRID CUSTOMIZATION (QUAN TRỌNG: ĐỒNG BỘ MÀU) */
-    /* Ép màu nền AgGrid về trùng màu Card */
+    /* 7. AG-GRID Dark Theme & Hover */
     .ag-theme-alpine-dark {{
         --ag-background-color: {CARD_BG} !important;
         --ag-header-background-color: #161616 !important;
-        --ag-odd-row-background-color: {CARD_BG} !important;
+        --ag-odd-row-background-color: rgba(255,255,255,0.02) !important;
         --ag-foreground-color: {TEXT_SUB} !important;
         --ag-border-color: rgba(255,255,255,0.1) !important;
         --ag-header-foreground-color: {ACCENT} !important;
+        --ag-row-hover-color: rgba(6, 104, 57, 0.3) !important; /* Màu hover dòng xanh lá */
         font-family: 'Segoe UI' !important;
     }}
-    /* Bo tròn khung AgGrid */
     .stAgGrid {{
-        border-radius: 12px;
-        overflow: hidden;
+        border-radius: 12px; overflow: hidden;
         border: 1px solid rgba(255,255,255,0.05);
         box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        transition: box-shadow 0.3s;
     }}
+    .stAgGrid:hover {{ box-shadow: 0 0 15px rgba(0, 230, 118, 0.15); }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -129,11 +171,11 @@ st.markdown(f"""
         {logo_img}
         <div>
             <div class="app-title">MỘC PHÁT INTELLIGENCE</div>
-            <div style="font-size:13px; color:{TEXT_SUB};">Dark Mode • Seamless Design</div>
+            <div style="font-size:13px; color:{TEXT_SUB};">Premium Dark Edition</div>
         </div>
     </div>
     <div style="text-align:right;">
-        <span style="font-weight:bold; color:{ACCENT}; font-size:14px;">Master 2023-2025</span>
+        <span style="font-weight:bold; color:{ACCENT}; font-size:14px; text-shadow: 0 0 10px rgba(102,187,106,0.5);">Master 2023-2025</span>
     </div>
 </div>
 """, unsafe_allow_html=True)
@@ -201,9 +243,9 @@ if sel_cust: df = df[df['khach_hang'].isin(sel_cust)]
 if df.empty: st.warning("Không có dữ liệu!"); st.stop()
 
 # ==========================================
-# 4. KPI CARDS
+# 4. KPI CARDS (GLOW EFFECT)
 # ==========================================
-st.subheader("🚀 HIỆU QUẢ KINH DOANH (YoY)")
+st.subheader("🚀 HIỆU QUẢ KINH DOANH")
 vol_by_year = df.groupby('year')['sl'].sum()
 v24 = vol_by_year.get(2024, 0)
 v23 = vol_by_year.get(2023, 0)
@@ -224,7 +266,7 @@ def kpi_card(col, year_label, val, growth_val, compare_label="so với năm trư
     </div>
     """, unsafe_allow_html=True)
 
-kpi_card(c1, "SẢN LƯỢNG 2023", v23, 0, "(Base Year)")
+kpi_card(c1, "SẢN LƯỢNG 2023", v23, 0, "(Base)")
 kpi_card(c2, "SẢN LƯỢNG 2024", v24, g24, "vs 2023")
 kpi_card(c3, "SẢN LƯỢNG 2025", vol_by_year.get(2025,0), 0, "(Current)")
 kpi_card(c4, "KHÁCH HÀNG ACTIVE", df['khach_hang'].nunique(), 0, "Đối tác")
@@ -238,23 +280,15 @@ tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
     "📊 TỔNG QUAN", "🎯 KẾ HOẠCH 2026", "🎨 SỨC KHỎE SP", "🌡️ MÙA VỤ", "⚖️ KHÁCH HÀNG", "📋 DỮ LIỆU"
 ])
 
-# --- Helper Function tạo AgGrid Dark Mode ---
 def render_dark_aggrid(dataframe, height=400):
     gb = GridOptionsBuilder.from_dataframe(dataframe)
     gb.configure_pagination(paginationAutoPageSize=True)
     gb.configure_selection('multiple', use_checkbox=True)
     gb.configure_default_column(resizable=True, filterable=True, sortable=True)
-    
-    # Format số cho đẹp
     for col in dataframe.select_dtypes(include=['number']).columns:
         gb.configure_column(col, type=["numericColumn", "numberColumnFilter"], precision=0)
-        
     gridOptions = gb.build()
-    
-    # Quan trọng: Dùng theme alpine-dark để khớp với CSS custom
-    AgGrid(dataframe, gridOptions=gridOptions, height=height, 
-           theme='alpine-dark',  # Theme này sẽ được CSS override ở trên
-           enable_enterprise_modules=False)
+    AgGrid(dataframe, gridOptions=gridOptions, height=height, theme='alpine-dark', enable_enterprise_modules=False)
 
 # --- TAB 1: TỔNG QUAN ---
 with tab1:
@@ -265,8 +299,8 @@ with tab1:
         
         fig = go.Figure()
         fig.add_trace(go.Scatter(x=ts_data['ym'], y=ts_data['sl'], mode='lines+markers', name='Thực tế', 
-                                 line=dict(color=ACCENT, width=3, shape='spline'),
-                                 fill='tozeroy', fillcolor='rgba(102, 187, 106, 0.1)')) 
+                                 line=dict(color=NEON_GREEN, width=3, shape='spline'),
+                                 fill='tozeroy', fillcolor='rgba(0, 230, 118, 0.1)')) 
         
         ts_data['ma3'] = ts_data['sl'].rolling(window=3).mean()
         fig.add_trace(go.Scatter(x=ts_data['ym'], y=ts_data['ma3'], mode='lines', name='TB 3 tháng', line=dict(color='#FFA726', dash='dot')))
@@ -289,8 +323,8 @@ with tab1:
             <div class="insight-title">🤖 AI Phân tích nhanh:</div>
             <ul style="margin:0; padding-left:20px; font-size:14px; color: {TEXT_MAIN}">
                 <li>Tháng <b>{last_m['ym'].strftime('%m/%Y')}</b>: <b>{fmt_num(last_m['sl'])}</b> SP.</li>
-                <li>Biến động: <b style="color:{'#66BB6A' if mom>0 else '#EF5350'}">{mom:+.1f}%</b>.</li>
-                <li>Phát hiện <b>{len(anomalies)}</b> điểm bất thường trong quá khứ.</li>
+                <li>Biến động: <b style="color:{NEON_GREEN if mom>0 else '#EF5350'}">{mom:+.1f}%</b>.</li>
+                <li>Phát hiện <b>{len(anomalies)}</b> điểm bất thường.</li>
             </ul>
         </div>
         """, unsafe_allow_html=True)
@@ -315,7 +349,7 @@ with tab2:
                 <h4 style="margin:0; color:#FFA726">KỊCH BẢN +{growth_target}%</h4>
                 <div style="display:flex; justify-content:space-between; margin-top:10px;">
                     <div><div style="font-size:12px; color:{TEXT_SUB}">2025 Base</div><div style="font-size:20px; font-weight:bold">{fmt_num(sl_2025_total)}</div></div>
-                    <div><div style="font-size:12px; color:{TEXT_SUB}">2026 Target</div><div style="font-size:20px; font-weight:bold; color:{ACCENT}">{fmt_num(sl_2026_target)}</div></div>
+                    <div><div style="font-size:12px; color:{TEXT_SUB}">2026 Target</div><div style="font-size:20px; font-weight:bold; color:{NEON_GREEN}">{fmt_num(sl_2026_target)}</div></div>
                     <div><div style="font-size:12px; color:{TEXT_SUB}">Tăng thêm</div><div style="font-size:20px; font-weight:bold; color:#FFA726">+{fmt_num(sl_increase)}</div></div>
                 </div>
             </div>
@@ -329,7 +363,7 @@ with tab2:
         combined_forecast = pd.concat([monthly_2025, monthly_2026])
         
         fig_forecast = px.line(combined_forecast, x='month', y='sl', color='Type', markers=True, 
-                               color_discrete_map={'Thực tế 2025': '#757575', 'Mục tiêu 2026': ACCENT})
+                               color_discrete_map={'Thực tế 2025': '#757575', 'Mục tiêu 2026': NEON_GREEN})
         fig_forecast.update_traces(line=dict(width=3))
         st.plotly_chart(polish_chart(fig_forecast), use_container_width=True)
         
@@ -356,13 +390,11 @@ with tab3:
         color_data = df.groupby(['nhom_mau', 'mau_son'])['sl'].sum().reset_index()
         total_sl_color = color_data['sl'].sum()
         color_data = color_data[color_data['sl'] > (total_sl_color * 0.005)]
-        
         fig_sun = px.sunburst(
             color_data, path=['nhom_mau', 'mau_son'], values='sl', color='nhom_mau',
             color_discrete_map={"NÂU/GỖ": "#8D6E63", "TRẮNG/KEM": "#FFF9C4", "ĐEN/TỐI": "#424242", "XÁM": "#90A4AE", "TỰ NHIÊN": "#FFCC80"}
         )
         st.plotly_chart(polish_chart(fig_sun), use_container_width=True)
-        
     with col_detail_2:
         top_colors = df.groupby('mau_son')['sl'].sum().nlargest(10).sort_values(ascending=True).reset_index()
         fig_bar_col = px.bar(top_colors, x='sl', y='mau_son', orientation='h', text_auto='.2s', color='sl', color_continuous_scale='Greens')
@@ -401,7 +433,6 @@ with tab5:
         fig_p.update_layout(yaxis2=dict(overlaying='y', side='right', range=[0, 110]), showlegend=False)
         st.plotly_chart(polish_chart(fig_p), use_container_width=True)
     with c4_2:
-        # Thay thế bảng dataframe bằng AgGrid nhỏ cho đồng bộ
         curr_y, prev_y = df['year'].max(), df['year'].max()-1
         v_c = df[df['year']==curr_y].groupby('khach_hang')['sl'].sum()
         v_p = df[df['year']==prev_y].groupby('khach_hang')['sl'].sum()
@@ -413,8 +444,7 @@ with tab5:
 with tab6:
     st.subheader("Tra cứu dữ liệu")
     grid_df = df.groupby(['ma_hang', 'khach_hang', 'mau_son', 'nhom_mau', 'year']).agg(Tong_SL=('sl', 'sum')).reset_index().sort_values('Tong_SL', ascending=False)
-    # Dùng hàm render dark mode chuẩn
     render_dark_aggrid(grid_df, height=600)
 
 st.markdown("---")
-st.caption(f"© 2026 Mộc Phát Furniture | Dark Mode Absolute | Updated: {datetime.now().strftime('%d/%m/%Y')}")
+st.caption(f"© 2026 Mộc Phát Furniture | Premium Neon Edition | Updated: {datetime.now().strftime('%d/%m/%Y')}")
