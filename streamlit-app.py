@@ -9,7 +9,7 @@ from datetime import datetime
 from st_aggrid import AgGrid, GridOptionsBuilder
 
 # ==========================================
-# 1. CẤU HÌNH GIAO DIỆN (SUPER NEON GLOW EDITION)
+# 1. CẤU HÌNH GIAO DIỆN (CLEAN LUXURY EDITION)
 # ==========================================
 st.set_page_config(page_title="Mộc Phát Analytics Pro", layout="wide", page_icon="🌲")
 
@@ -17,133 +17,77 @@ st.set_page_config(page_title="Mộc Phát Analytics Pro", layout="wide", page_i
 PRIMARY = "#00C853"    
 NEON_GREEN = "#00E676" 
 BG_DARK = "#050505"    
-TEXT_MAIN = "#FFFFFF"
+TEXT_MAIN = "#FAFAFA"
 TEXT_SUB = "#B0BEC5"
 GRID_COLOR = "rgba(255, 255, 255, 0.05)"
 
-# --- CSS VISUAL EFFECTS (FLOATING BAR & SUPER GLOW) ---
+# --- CSS VISUAL EFFECTS (CLEAN & SMOOTH) ---
 css_style = """
 <style>
-    /* 1. NỀN DEEP NEBULA */
+    /* 1. NỀN DEEP NEBULA (Sạch & Sang) */
     .stApp {{
         background-color: {bg_dark};
+        /* Hiệu ứng ánh sáng loang nhẹ ở góc, không rối mắt */
         background-image: 
-            radial-gradient(at 50% 0%, rgba(0, 200, 83, 0.15) 0px, transparent 60%),
-            radial-gradient(at 90% 90%, rgba(0, 230, 118, 0.08) 0px, transparent 50%);
+            radial-gradient(at 0% 0%, rgba(0, 200, 83, 0.15) 0px, transparent 50%),
+            radial-gradient(at 100% 100%, rgba(0, 230, 118, 0.1) 0px, transparent 50%);
         background-attachment: fixed;
     }}
 
-    /* 2. HEADER: FLOATING GLASS BAR (BO TRÒN MỀM MẠI) */
+    /* 2. HEADER GLASSMORPHISM (Kính trong suốt) */
     .header-sticky {{
-        position: sticky; top: 20px; z-index: 999; /* Cách top 20px để lơ lửng */
-        background: rgba(15, 15, 15, 0.85);
-        backdrop-filter: blur(25px);
-        border: 1px solid rgba(0, 230, 118, 0.3);
-        padding: 15px 30px; 
-        margin-bottom: 40px;
-        margin-left: 10px; margin-right: 10px; /* Cách lề 2 bên */
-        border-radius: 50px; /* Bo tròn cực mạnh (Pill Shape) */
-        display: flex; 
-        align-items: center; 
-        justify-content: center;
-        box-shadow: 0 10px 40px rgba(0, 230, 118, 0.15); /* Bóng xanh tỏa rộng */
-    }}
-    
-    /* 3. LOGO & TEXT SUPER GLOW */
-    .glow-logo {{
-        filter: drop-shadow(0 0 15px {neon}); /* Logo tỏa sáng rộng hơn */
-        transition: transform 0.3s;
-    }}
-    .glow-logo:hover {{
-        transform: scale(1.1) rotate(5deg);
-        filter: drop-shadow(0 0 25px {neon});
-    }}
-    
-    .neon-title {{
-        font-family: 'Segoe UI', sans-serif;
-        font-weight: 900;
-        font-size: 32px; /* Chữ to hơn */
-        color: #fff;     /* Lõi chữ màu trắng để dễ đọc */
-        text-shadow: 
-            0 0 10px {neon},
-            0 0 20px {neon},
-            0 0 40px {primary}; /* 3 lớp bóng neon cực mạnh */
-        letter-spacing: 1px;
-        margin-top: 5px;
-        text-transform: uppercase;
+        position: sticky; top: 0; z-index: 999;
+        background: rgba(5, 5, 5, 0.8); /* Tối hơn để dễ đọc chữ */
+        backdrop-filter: blur(20px);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        padding: 15px 25px; 
+        margin-bottom: 25px;
+        border-radius: 0 0 16px 16px;
+        display: flex; align-items: center; justify-content: space-between;
+        box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
     }}
 
-    /* Badge bên phải */
-    .header-badge {{
-        position: absolute;
-        right: 30px;
-        top: 50%;
-        transform: translateY(-50%);
-        border: 1px solid {primary};
-        color: {neon};
-        padding: 6px 18px;
-        border-radius: 30px;
-        font-size: 11px;
-        font-weight: 700;
-        background: rgba(0, 200, 83, 0.15);
-        box-shadow: 0 0 10px rgba(0, 200, 83, 0.2);
-    }}
-
-    /* 4. SUBHEADERS */
-    h3 {{
-        color: {text_main} !important;
-        font-family: 'Segoe UI', sans-serif;
-        font-weight: 700 !important;
-        border-left: 4px solid {neon};
-        padding-left: 15px;
-        margin-top: 25px !important;
-        text-shadow: 0 0 15px rgba(0, 230, 118, 0.4);
-    }}
-
-    /* 5. KPI CARDS (Soft Edges) */
+    /* 3. KPI CARDS (Minimalist Glow) */
     .kpi-card {{
         background: rgba(30, 30, 30, 0.6);
-        backdrop-filter: blur(12px);
-        border-radius: 20px; /* Bo góc card mềm hơn */
-        padding: 22px;
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        border-left: 5px solid {primary};
-        box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        backdrop-filter: blur(10px);
+        border-radius: 16px;
+        padding: 20px;
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        border-left: 4px solid {primary};
+        box-shadow: 0 4px 10px rgba(0,0,0,0.3);
         transition: all 0.3s ease;
     }}
     .kpi-card:hover {{
-        transform: translateY(-6px);
+        transform: translateY(-5px);
         border-left-color: {neon};
-        box-shadow: 0 10px 35px rgba(0, 230, 118, 0.2);
-        background: rgba(50, 50, 50, 0.8);
+        box-shadow: 0 8px 25px rgba(0, 230, 118, 0.2);
+        background: rgba(40, 40, 40, 0.7);
     }}
-    .kpi-val {{ font-size: 30px; font-weight: 800; color: {text_main}; letter-spacing: -0.5px; margin: 5px 0; }}
+    .kpi-lbl {{ font-size: 12px; color: {text_sub}; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px; }}
+    .kpi-val {{ font-size: 28px; font-weight: 800; color: {text_main}; letter-spacing: -0.5px; }}
 
-    /* 6. TABS */
-    .stTabs [data-baseweb="tab-list"] {{ gap: 12px; background: transparent; }}
+    /* 4. TABS & AGGRID */
+    .stTabs [data-baseweb="tab-list"] {{ gap: 8px; background: transparent; }}
     .stTabs [data-baseweb="tab"] {{ 
-        background-color: rgba(255,255,255,0.05); 
+        background-color: rgba(255,255,255,0.03); 
         color: {text_sub}; 
-        border-radius: 12px; /* Tab bo tròn hơn */
-        padding: 10px 24px;
+        border-radius: 8px; 
         border: 1px solid transparent;
     }}
     .stTabs [aria-selected="true"] {{ 
-        border: 1px solid {neon};
+        border: 1px solid {primary};
         color: {neon};
-        background: rgba(0, 230, 118, 0.1);
-        font-weight: bold;
-        box-shadow: 0 0 15px rgba(0, 230, 118, 0.15);
+        background: rgba(0, 200, 83, 0.1);
     }}
     
-    /* AgGrid Fix */
+    /* AgGrid Dark Theme Clean */
     .ag-theme-alpine-dark {{
-        --ag-background-color: #101010 !important;
-        --ag-header-background-color: #181818 !important;
-        --ag-odd-row-background-color: #101010 !important;
+        --ag-background-color: #0F0F0F !important;
+        --ag-header-background-color: #151515 !important;
+        --ag-odd-row-background-color: #0F0F0F !important;
         --ag-foreground-color: {text_sub} !important;
         --ag-border-color: #333 !important;
-        font-family: 'Segoe UI', sans-serif !important;
     }}
 </style>
 """.format(
@@ -216,7 +160,7 @@ df_raw, error = load_data()
 if error: st.error(error); st.stop()
 
 # ==========================================
-# 3. HEADER (FLOATING & SUPER NEON)
+# 3. HEADER & SIDEBAR
 # ==========================================
 def get_base64_logo(path):
     if os.path.exists(path):
@@ -225,22 +169,19 @@ def get_base64_logo(path):
     return None
 
 logo_b64 = get_base64_logo("mocphat_logo.png")
-# Logo to hơn chút (height=70)
-logo_img = f'<img src="data:image/png;base64,{logo_b64}" height="70" class="glow-logo">' if logo_b64 else '<span style="font-size:60px">🌲</span>'
+logo_img = f'<img src="data:image/png;base64,{logo_b64}" height="45">' if logo_b64 else "🌲"
 
 st.markdown(f"""
 <div class="header-sticky">
-    <div style="text-align:center;">
+    <div style="display:flex; gap:15px; align-items:center;">
         {logo_img}
-        <div class="neon-title">
-            MỘC PHÁT INTELLIGENCE
-        </div>
-        <div style="font-size:13px; color:{TEXT_SUB}; letter-spacing:3px; margin-top:5px; font-weight:300;">
-            EXECUTIVE DASHBOARD
+        <div>
+            <div style="font-size:22px; font-weight:800; color:{NEON_GREEN}; letter-spacing:-0.5px;">MỘC PHÁT INTELLIGENCE</div>
+            <div style="font-size:12px; color:{TEXT_SUB}; letter-spacing:1px;">LUXURY ANALYTICS SUITE</div>
         </div>
     </div>
-    <div class="header-badge">
-        PRO VERSION
+    <div style="text-align:right;">
+        <span style="font-weight:bold; color:{TEXT_MAIN}; border:1px solid {PRIMARY}; padding:5px 12px; border-radius:20px; font-size:11px; letter-spacing:1px;">MASTER 2023-2025</span>
     </div>
 </div>
 """, unsafe_allow_html=True)
@@ -268,15 +209,15 @@ c1, c2, c3, c4 = st.columns(4)
 
 def kpi_card(col, lbl, val, sub_val, sub_lbl):
     val_str = f"{val:,.0f}" 
-    color = NEON_GREEN if sub_val >= 0 else "#FF5252"
+    color = NEON_GREEN if sub_val >= 0 else "#EF5350"
     icon = "▲" if sub_val >= 0 else "▼"
     
     col.markdown(f"""
     <div class="kpi-card">
         <div class="kpi-lbl">{lbl}</div>
         <div class="kpi-val">{val_str}</div>
-        <div style="font-size:14px; font-weight:700; margin-top:8px; color:{color}">
-            {icon} {abs(sub_val):.1f}% <span style="color:{TEXT_SUB}; font-weight:normal; font-size:13px">{sub_lbl}</span>
+        <div style="font-size:13px; font-weight:600; margin-top:8px; color:{color}">
+            {icon} {abs(sub_val):.1f}% <span style="color:{TEXT_SUB}; font-weight:normal;">{sub_lbl}</span>
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -339,13 +280,12 @@ with tab1:
             sl_fmt = f"{last_m['sl']:,.0f}"
             
             st.markdown(f"""
-            <div style="background:rgba(20, 20, 20, 0.6); border-left:4px solid {NEON_GREEN}; padding:20px; border-radius:12px; border:1px solid rgba(255,255,255,0.08);">
-                <div style="color:{NEON_GREEN}; font-weight:800; margin-bottom:12px; font-size:16px;">🤖 AI QUICK STATS</div>
-                <div style="font-size:15px; color:{TEXT_MAIN}; line-height:1.8">
-                • Tháng <b>{last_m['ym'].strftime('%m/%Y')}</b>: <br>
-                  <span style="font-size:24px; font-weight:bold; color:{TEXT_MAIN}">{sl_fmt}</span> SP<br>
-                • Biến động: <b style="color:{NEON_GREEN if mom>0 else '#FF5252'}">{mom:+.1f}%</b> so với tháng trước.<br>
-                • Phát hiện <b style="color:#FFA726">{len(anomalies)}</b> điểm bất thường.
+            <div style="background:rgba(20, 20, 20, 0.5); border-left:3px solid {NEON_GREEN}; padding:15px; border-radius:8px; border:1px solid rgba(255,255,255,0.05);">
+                <div style="color:{NEON_GREEN}; font-weight:bold; margin-bottom:8px">🤖 AI Quick Stats:</div>
+                <div style="font-size:14px; color:{TEXT_MAIN}; line-height:1.6">
+                • Tháng <b>{last_m['ym'].strftime('%m/%Y')}</b> đạt <b>{sl_fmt}</b> SP.<br>
+                • Tăng trưởng: <b style="color:{NEON_GREEN if mom>0 else '#EF5350'}">{mom:+.1f}%</b> so với tháng trước.<br>
+                • Phát hiện <b>{len(anomalies)}</b> điểm bất thường.
                 </div>
             </div>
             """, unsafe_allow_html=True)
@@ -369,11 +309,11 @@ with tab2:
         
         with col_info:
             st.markdown(f"""
-            <div style="background:rgba(255,167,38,0.05); border:1px solid #FFA726; padding:20px; border-radius:12px; display:flex; justify-content:space-around; align-items:center;">
-                <div style="text-align:center"><div style="font-size:13px; color:#aaa; font-weight:600">2025 BASE</div><div style="font-size:28px; font-weight:bold">{v25}</div></div>
-                <div style="font-size:24px; color:#FFA726">➔</div>
-                <div style="text-align:center"><div style="font-size:13px; color:#aaa; font-weight:600">2026 TARGET</div><div style="font-size:28px; font-weight:bold; color:{NEON_GREEN}">{v26}</div></div>
-                <div style="text-align:center"><div style="font-size:13px; color:#aaa; font-weight:600">GAP (+{growth_target}%)</div><div style="font-size:28px; font-weight:bold; color:#FFA726">+{v_gap}</div></div>
+            <div style="background:rgba(255,167,38,0.1); border:1px solid #FFA726; padding:15px; border-radius:12px; display:flex; justify-content:space-around; align-items:center;">
+                <div style="text-align:center"><div style="font-size:12px; color:#aaa">2025 BASE</div><div style="font-size:24px; font-weight:bold">{v25}</div></div>
+                <div style="font-size:20px; color:#FFA726">➔</div>
+                <div style="text-align:center"><div style="font-size:12px; color:#aaa">2026 TARGET</div><div style="font-size:24px; font-weight:bold; color:{NEON_GREEN}">{v26}</div></div>
+                <div style="text-align:center"><div style="font-size:12px; color:#aaa">GAP (+{growth_target}%)</div><div style="font-size:24px; font-weight:bold; color:#FFA726">+{v_gap}</div></div>
             </div>
             """, unsafe_allow_html=True)
             
@@ -458,4 +398,4 @@ with tab6:
     render_dark_aggrid(grid_df, height=600)
 
 st.markdown("---")
-st.caption(f"© 2026 Mộc Phát Furniture | Super Neon Edition | Updated: {datetime.now().strftime('%d/%m/%Y')}")
+st.caption(f"© 2026 Mộc Phát Furniture | Cyber Glass Edition | Updated: {datetime.now().strftime('%d/%m/%Y')}")
