@@ -9,7 +9,7 @@ from datetime import datetime
 from st_aggrid import AgGrid, GridOptionsBuilder
 
 # ==========================================
-# 1. CẤU HÌNH GIAO DIỆN (CLEAN LUXURY EDITION)
+# 1. CẤU HÌNH GIAO DIỆN (CYBER GLASS FINAL)
 # ==========================================
 st.set_page_config(page_title="Mộc Phát Analytics Pro", layout="wide", page_icon="🌲")
 
@@ -21,25 +21,22 @@ TEXT_MAIN = "#FAFAFA"
 TEXT_SUB = "#B0BEC5"
 GRID_COLOR = "rgba(255, 255, 255, 0.05)"
 
-# --- CSS VISUAL EFFECTS (CLEAN & SMOOTH) ---
+# --- CSS AN TOÀN (Dùng .format() để tránh lỗi cú pháp) ---
 css_style = """
 <style>
-    /* 1. NỀN DEEP NEBULA (Sạch & Sang) */
+    /* 1. NỀN TECH GRID */
     .stApp {{
         background-color: {bg_dark};
-        /* Hiệu ứng ánh sáng loang nhẹ ở góc, không rối mắt */
-        background-image: 
-            radial-gradient(at 0% 0%, rgba(0, 200, 83, 0.15) 0px, transparent 50%),
-            radial-gradient(at 100% 100%, rgba(0, 230, 118, 0.1) 0px, transparent 50%);
-        background-attachment: fixed;
+        background-image: radial-gradient(#1A1A1A 1px, transparent 1px);
+        background-size: 20px 20px;
     }}
 
-    /* 2. HEADER GLASSMORPHISM (Kính trong suốt) */
+    /* 2. HEADER GLASSMORPHISM */
     .header-sticky {{
         position: sticky; top: 0; z-index: 999;
-        background: rgba(5, 5, 5, 0.8); /* Tối hơn để dễ đọc chữ */
-        backdrop-filter: blur(20px);
-        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        background: rgba(10, 10, 10, 0.7);
+        backdrop-filter: blur(15px);
+        border-bottom: 1px solid rgba(0, 230, 118, 0.2);
         padding: 15px 25px; 
         margin-bottom: 25px;
         border-radius: 0 0 16px 16px;
@@ -47,25 +44,25 @@ css_style = """
         box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
     }}
 
-    /* 3. KPI CARDS (Minimalist Glow) */
+    /* 3. KPI CARDS (HOLOGRAPHIC) */
     .kpi-card {{
-        background: rgba(30, 30, 30, 0.6);
+        background: rgba(25, 25, 25, 0.6);
         backdrop-filter: blur(10px);
         border-radius: 16px;
         padding: 20px;
         border: 1px solid rgba(255, 255, 255, 0.05);
         border-left: 4px solid {primary};
-        box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-        transition: all 0.3s ease;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     }}
     .kpi-card:hover {{
         transform: translateY(-5px);
         border-left-color: {neon};
-        box-shadow: 0 8px 25px rgba(0, 230, 118, 0.2);
-        background: rgba(40, 40, 40, 0.7);
+        box-shadow: 0 10px 40px -10px rgba(0, 230, 118, 0.3);
+        border-top: 1px solid rgba(0, 230, 118, 0.2);
     }}
-    .kpi-lbl {{ font-size: 12px; color: {text_sub}; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px; }}
-    .kpi-val {{ font-size: 28px; font-weight: 800; color: {text_main}; letter-spacing: -0.5px; }}
+    .kpi-lbl {{ font-size: 12px; color: {text_sub}; text-transform: uppercase; letter-spacing: 1px; }}
+    .kpi-val {{ font-size: 28px; font-weight: 800; color: {text_main}; }}
 
     /* 4. TABS & AGGRID */
     .stTabs [data-baseweb="tab-list"] {{ gap: 8px; background: transparent; }}
@@ -73,7 +70,6 @@ css_style = """
         background-color: rgba(255,255,255,0.03); 
         color: {text_sub}; 
         border-radius: 8px; 
-        border: 1px solid transparent;
     }}
     .stTabs [aria-selected="true"] {{ 
         border: 1px solid {primary};
@@ -81,11 +77,11 @@ css_style = """
         background: rgba(0, 200, 83, 0.1);
     }}
     
-    /* AgGrid Dark Theme Clean */
+    /* AgGrid Dark Theme Fix */
     .ag-theme-alpine-dark {{
-        --ag-background-color: #0F0F0F !important;
-        --ag-header-background-color: #151515 !important;
-        --ag-odd-row-background-color: #0F0F0F !important;
+        --ag-background-color: #121212 !important;
+        --ag-header-background-color: #1A1A1A !important;
+        --ag-odd-row-background-color: #121212 !important;
         --ag-foreground-color: {text_sub} !important;
         --ag-border-color: #333 !important;
     }}
@@ -176,12 +172,12 @@ st.markdown(f"""
     <div style="display:flex; gap:15px; align-items:center;">
         {logo_img}
         <div>
-            <div style="font-size:22px; font-weight:800; color:{NEON_GREEN}; letter-spacing:-0.5px;">MỘC PHÁT INTELLIGENCE</div>
-            <div style="font-size:12px; color:{TEXT_SUB}; letter-spacing:1px;">LUXURY ANALYTICS SUITE</div>
+            <div style="font-size:22px; font-weight:800; color:{NEON_GREEN}; text-shadow: 0 0 15px rgba(0,230,118,0.4);">MỘC PHÁT INTELLIGENCE</div>
+            <div style="font-size:12px; color:{TEXT_SUB}; letter-spacing:1px;">CYBER GLASS EDITION</div>
         </div>
     </div>
     <div style="text-align:right;">
-        <span style="font-weight:bold; color:{TEXT_MAIN}; border:1px solid {PRIMARY}; padding:5px 12px; border-radius:20px; font-size:11px; letter-spacing:1px;">MASTER 2023-2025</span>
+        <span style="font-weight:bold; color:{TEXT_MAIN}; border:1px solid {PRIMARY}; padding:5px 10px; border-radius:20px; font-size:12px;">Master 2023-2025</span>
     </div>
 </div>
 """, unsafe_allow_html=True)
@@ -197,7 +193,7 @@ if sel_cust: df = df[df['khach_hang'].isin(sel_cust)]
 if df.empty: st.warning("Không có dữ liệu!"); st.stop()
 
 # ==========================================
-# 4. KPI CARDS
+# 4. KPI CARDS (HOLOGRAPHIC - FIXED)
 # ==========================================
 st.subheader("🚀 HIỆU QUẢ KINH DOANH")
 vol_by_year = df.groupby('year')['sl'].sum()
@@ -207,8 +203,11 @@ g24 = ((v24 - v23) / v23 * 100) if v23 > 0 else 0
 
 c1, c2, c3, c4 = st.columns(4)
 
+# HÀM KPI CARD ĐƯỢC SỬA LẠI ĐỂ KHÔNG GỌI HÀM BÊN NGOÀI GÂY LỖI
 def kpi_card(col, lbl, val, sub_val, sub_lbl):
+    # Định dạng số trực tiếp tại đây để tránh lỗi NameError
     val_str = f"{val:,.0f}" 
+    
     color = NEON_GREEN if sub_val >= 0 else "#EF5350"
     icon = "▲" if sub_val >= 0 else "▼"
     
@@ -254,10 +253,10 @@ with tab1:
         ts_data = df.groupby('ym')['sl'].sum().reset_index().sort_values('ym')
         
         fig = go.Figure()
-        # Area chart clean
+        # Area chart với gradient
         fig.add_trace(go.Scatter(x=ts_data['ym'], y=ts_data['sl'], mode='lines+markers', name='Thực tế', 
                                  line=dict(color=NEON_GREEN, width=3, shape='spline'),
-                                 fill='tozeroy', fillcolor='rgba(0, 230, 118, 0.1)')) 
+                                 fill='tozeroy', fillcolor='rgba(0, 230, 118, 0.15)')) 
         
         ts_data['ma3'] = ts_data['sl'].rolling(window=3).mean()
         fig.add_trace(go.Scatter(x=ts_data['ym'], y=ts_data['ma3'], mode='lines', name='TB 3 tháng', line=dict(color='#FFA726', dash='dot')))
@@ -277,10 +276,12 @@ with tab1:
             last_m = ts_data.iloc[-1]
             prev_m = ts_data.iloc[-2] if len(ts_data) > 1 else last_m
             mom = ((last_m['sl'] - prev_m['sl'])/prev_m['sl']*100) if prev_m['sl']>0 else 0
+            
+            # Định dạng số trực tiếp trong chuỗi f-string
             sl_fmt = f"{last_m['sl']:,.0f}"
             
             st.markdown(f"""
-            <div style="background:rgba(20, 20, 20, 0.5); border-left:3px solid {NEON_GREEN}; padding:15px; border-radius:8px; border:1px solid rgba(255,255,255,0.05);">
+            <div style="background:linear-gradient(135deg, rgba(0, 230, 118, 0.05), transparent); border-left:3px solid {NEON_GREEN}; padding:15px; border-radius:8px; border:1px solid rgba(255,255,255,0.05);">
                 <div style="color:{NEON_GREEN}; font-weight:bold; margin-bottom:8px">🤖 AI Quick Stats:</div>
                 <div style="font-size:14px; color:{TEXT_MAIN}; line-height:1.6">
                 • Tháng <b>{last_m['ym'].strftime('%m/%Y')}</b> đạt <b>{sl_fmt}</b> SP.<br>
@@ -303,6 +304,7 @@ with tab2:
         sl_2025_total = base_2025['sl'].sum()
         sl_2026_target = sl_2025_total * growth_factor
         
+        # Định dạng số
         v25 = f"{sl_2025_total:,.0f}"
         v26 = f"{sl_2026_target:,.0f}"
         v_gap = f"{sl_2026_target - sl_2025_total:,.0f}"
