@@ -9,15 +9,15 @@ from datetime import datetime
 from st_aggrid import AgGrid, GridOptionsBuilder
 
 # ==========================================
-# 1. CẤU HÌNH & GIAO DIỆN (PHOENIX EDITION)
+# 1. CẤU HÌNH & GIAO DIỆN (DEEP AURORA)
 # ==========================================
 st.set_page_config(page_title="Mộc Phát Strategy Hub", layout="wide", page_icon="🌲")
 
 # BẢNG MÀU CHIẾN LƯỢC
-PRIMARY = "#00E676"     # Tăng trưởng / Tốt
-WARNING = "#FFA726"     # Cảnh báo (Mẫu mới quá nhiều)
-DANGER  = "#FF5252"     # Nguy hiểm (Chậm tiến độ/Chất lượng)
-INFO    = "#2979FF"     # Thông tin
+PRIMARY = "#00E676"    # Tăng trưởng / Tốt
+WARNING = "#FFA726"    # Cảnh báo / Trung bình
+DANGER  = "#FF5252"    # Nguy hiểm / Giảm
+INFO    = "#2979FF"    # Thông tin
 BG_DARK = "#050505"
 TEXT_MAIN = "#FFFFFF"
 TEXT_SUB = "#B0BEC5"
@@ -41,27 +41,25 @@ st.markdown(f"""
         text-transform: uppercase; letter-spacing: 2px;
         text-shadow: 0 0 20px rgba(0, 230, 118, 0.4);
     }}
-    .sub-title {{ font-size: 14px; color: {TEXT_SUB}; letter-spacing: 1px; font-weight: 300; margin-top:5px; }}
+    .sub-title {{ font-size: 14px; color: {TEXT_SUB}; letter-spacing: 4px; font-weight: 300; margin-top:5px; }}
 
-    /* Strategy Card (Quan trọng) */
-    .strategy-card {{
+    /* Report Card (Khung chứa Insight - Quan trọng) */
+    .report-card {{
         background: rgba(255, 255, 255, 0.03);
         backdrop-filter: blur(16px);
-        border-left: 4px solid {INFO};
+        border-left: 4px solid {INFO}; /* Mặc định là Info */
         border-radius: 12px;
         padding: 20px;
         margin-bottom: 20px;
         box-shadow: 0 4px 20px rgba(0,0,0,0.2);
     }}
-    .strategy-title {{ font-weight: 700; font-size: 16px; color: {TEXT_MAIN}; display: flex; align-items: center; gap: 10px; }}
-    .strategy-content {{ font-size: 14px; color: {TEXT_SUB}; line-height: 1.6; margin-top: 10px; text-align: justify; }}
-    
-    /* Highlight text */
-    .hl-good {{ color: {PRIMARY}; font-weight: bold; }}
-    .hl-warn {{ color: {WARNING}; font-weight: bold; }}
-    .hl-bad {{ color: {DANGER}; font-weight: bold; }}
+    .report-title {{ font-weight: 700; font-size: 16px; color: {TEXT_MAIN}; display: flex; align-items: center; gap: 10px; }}
+    .report-content {{ font-size: 14px; color: {TEXT_SUB}; line-height: 1.6; margin-top: 10px; text-align: justify; }}
+    .highlight {{ color: {PRIMARY}; font-weight: bold; }}
+    .warn {{ color: {WARNING}; font-weight: bold; }}
+    .danger {{ color: {DANGER}; font-weight: bold; }}
 
-    /* Glass Box for Charts */
+    /* Glass Card cho Chart */
     .glass-box {{
         background: rgba(255, 255, 255, 0.02);
         backdrop-filter: blur(12px);
@@ -70,17 +68,11 @@ st.markdown(f"""
         padding: 15px;
         height: 100%;
     }}
-    
-    /* AgGrid & Tabs */
+
+    /* Tùy chỉnh Tab */
     .stTabs [data-baseweb="tab-list"] {{ gap: 10px; }}
     .stTabs [data-baseweb="tab"] {{ background: rgba(255,255,255,0.03); border-radius: 8px; color: {TEXT_SUB}; }}
     .stTabs [aria-selected="true"] {{ background: rgba(0, 230, 118, 0.1); border: 1px solid {PRIMARY}; color: {PRIMARY}; }}
-    
-    .ag-theme-alpine-dark {{
-        --ag-background-color: transparent !important;
-        --ag-header-background-color: rgba(255,255,255,0.05) !important;
-        --ag-odd-row-background-color: rgba(255,255,255,0.02) !important;
-    }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -98,7 +90,7 @@ def polish_chart(fig):
     return fig
 
 # ==========================================
-# 2. XỬ LÝ DỮ LIỆU & GIẢ LẬP LOGIC 70/30
+# 2. XỬ LÝ DỮ LIỆU & LOGIC INSIGHT (CORE)
 # ==========================================
 @st.cache_data(ttl=3600)
 def load_data():
@@ -118,27 +110,17 @@ def load_data():
         season_map = {12:'Đông', 1:'Đông', 2:'Đông', 3:'Xuân', 4:'Xuân', 5:'Xuân', 6:'Hè', 7:'Hè', 8:'Hè', 9:'Thu', 10:'Thu', 11:'Thu'}
         df['mua'] = df['month'].map(season_map)
         
-        # Xử lý màu
+        # Xử lý màu & USB (Giữ nguyên logic cũ)
         def get_color_group(v):
             v = str(v).upper()
             if any(x in v for x in ["BROWN", "NAU", "WALNUT"]): return "NÂU/GỖ"
             if any(x in v for x in ["WHITE", "TRANG", "CREAM"]): return "TRẮNG/KEM"
             if any(x in v for x in ["BLACK", "DEN"]): return "ĐEN/TỐI"
+            if any(x in v for x in ["GREY", "XAM"]): return "XÁM"
+            if any(x in v for x in ["NATURAL", "TU NHIEN"]): return "TỰ NHIÊN"
             return "MÀU KHÁC"
         df['nhom_mau'] = df['mau_son'].apply(get_color_group) if 'mau_son' in df.columns else "MÀU KHÁC"
-        
-        # --- GIẢ LẬP LOGIC MẪU MỚI / CŨ (Quan trọng cho bài toán của chị Ngọc) ---
-        # Logic: Những mã hàng xuất hiện lần đầu tiên trong năm hiện tại được coi là "Mẫu Mới"
-        # Những mã hàng đã xuất hiện ở các năm trước là "Mẫu Cũ" (Repeat Order)
-        
-        # 1. Tìm năm xuất hiện đầu tiên của từng mã hàng
-        first_appearance = df.groupby('ma_hang')['year'].min().reset_index()
-        first_appearance.rename(columns={'year': 'first_year'}, inplace=True)
-        
-        df = df.merge(first_appearance, on='ma_hang', how='left')
-        
-        # 2. Gán nhãn: Nếu năm bán == năm đầu tiên -> Mẫu Mới, ngược lại -> Mẫu Cũ
-        df['loai_mau'] = np.where(df['year'] == df['first_year'], 'Mẫu Mới (New)', 'Mẫu Cũ (Repeat)')
+        df['is_usb_clean'] = df['is_usb'].astype(str).apply(lambda x: 'Có USB' if 'true' in x.lower() else 'Không USB') if 'is_usb' in df.columns else 'N/A'
         
         return df, None
     except Exception as e: return None, str(e)
@@ -146,13 +128,16 @@ def load_data():
 df_raw, error = load_data()
 if error: st.error(error); st.stop()
 
+# --- HÀM TẠO TEXT REPORT (QUAN TRỌNG) ---
 def generate_insight_box(title, content, type="info"):
     colors = {"success": PRIMARY, "warning": WARNING, "danger": DANGER, "info": INFO}
     icon = {"success": "🚀", "warning": "⚠️", "danger": "🔥", "info": "💡"}
+    border_color = colors.get(type, INFO)
+    
     st.markdown(f"""
-    <div class="strategy-card" style="border-left: 4px solid {colors.get(type, INFO)};">
-        <div class="strategy-title" style="color:{colors.get(type, INFO)}">{icon[type]} {title}</div>
-        <div class="strategy-content">{content}</div>
+    <div class="report-card" style="border-left: 4px solid {border_color};">
+        <div class="report-title" style="color:{border_color}">{icon[type]} {title}</div>
+        <div class="report-content">{content}</div>
     </div>
     """, unsafe_allow_html=True)
 
@@ -168,7 +153,7 @@ st.markdown(f"""
 <div class="header-container">
     {logo_img}
     <div class="neon-title">MỘC PHÁT INTELLIGENCE</div>
-    <div class="sub-title">STRATEGY 2026: 70% REPEAT - 30% NEW</div>
+    <div class="sub-title">BÁO CÁO CHIẾN LƯỢC SẢN XUẤT</div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -178,169 +163,132 @@ df = df_raw[df_raw['year'].isin(sel_years)] if sel_years else df_raw
 if df.empty: st.warning("Chưa có dữ liệu."); st.stop()
 
 # ==========================================
-# 4. TAB CHIẾN LƯỢC (ĐƯỢC ĐƯA LÊN ĐẦU)
+# 4. KPI SUMMARY (HIỆU SUẤT)
 # ==========================================
-tab1, tab2, tab3, tab4 = st.tabs(["🛡️ CHIẾN LƯỢC 70/30", "📊 HIỆU QUẢ SẢN XUẤT", "🎨 SẢN PHẨM & MÙA VỤ", "📋 DỮ LIỆU"])
+st.subheader("1. Tổng quan Hiệu suất")
+v_total = df['sl'].sum()
+avg_month = df.groupby('ym')['sl'].sum().mean()
+curr_year = df['year'].max()
+v_curr = df[df['year']==curr_year]['sl'].sum()
+v_prev = df[df['year']==curr_year-1]['sl'].sum()
+growth = ((v_curr - v_prev)/v_prev*100) if v_prev > 0 else 0
 
-# --- TAB 1: CHIẾN LƯỢC 70/30 (DÀNH RIÊNG CHO CHỊ NGỌC) ---
-with tab1:
-    st.markdown("### 🎯 Theo dõi Mục tiêu: Ổn định (70%) & Đổi mới (30%)")
-    
-    # Tính toán tỷ lệ thực tế
-    curr_year = df['year'].max()
-    df_curr = df[df['year'] == curr_year]
-    
-    mix_data = df_curr.groupby('loai_mau')['sl'].sum().reset_index()
-    total_vol = mix_data['sl'].sum()
-    mix_data['percent'] = (mix_data['sl'] / total_vol * 100)
-    
-    try:
-        new_perc = mix_data[mix_data['loai_mau'] == 'Mẫu Mới (New)']['percent'].values[0]
-    except: new_perc = 0
-    
-    old_perc = 100 - new_perc
-    
-    # 1. KPI CARDS
-    c_s1, c_s2, c_s3 = st.columns(3)
-    with c_s1:
-        st.markdown(f"""
-        <div class="glass-box" style="text-align:center; border: 1px solid {PRIMARY}">
-            <div style="color:{TEXT_SUB}">MẪU CŨ (MỤC TIÊU >70%)</div>
-            <div style="font-size:36px; font-weight:bold; color:{PRIMARY}">{old_perc:.1f}%</div>
-            <div style="font-size:12px; color:#aaa">Dòng sản phẩm ổn định</div>
-        </div>
-        """, unsafe_allow_html=True)
-    with c_s2:
-        color_new = PRIMARY if 25 <= new_perc <= 35 else WARNING 
-        st.markdown(f"""
-        <div class="glass-box" style="text-align:center; border: 1px solid {color_new}">
-            <div style="color:{TEXT_SUB}">MẪU MỚI (MỤC TIÊU ~30%)</div>
-            <div style="font-size:36px; font-weight:bold; color:{color_new}">{new_perc:.1f}%</div>
-            <div style="font-size:12px; color:#aaa">R&D & Đổi mới</div>
-        </div>
-        """, unsafe_allow_html=True)
-    with c_s3:
-        # Giả lập tăng trưởng 2026
-        base_25 = df_raw[df_raw['year'] == 2025]['sl'].sum()
-        target_26 = base_25 * 1.15
-        forecast_curr = total_vol # Giả sử total_vol là hiện tại (nếu lọc 2026)
-        # Nếu đang lọc nhiều năm, logic này chỉ mang tính demo
-        gap = target_26 - total_vol
-        
-        st.markdown(f"""
-        <div class="glass-box" style="text-align:center; border: 1px solid #FFA726">
-            <div style="color:{TEXT_SUB}">MỤC TIÊU TĂNG TRƯỞNG 2026</div>
-            <div style="font-size:36px; font-weight:bold; color:#FFA726">15%</div>
-            <div style="font-size:12px; color:#aaa">Cần thêm: {fmt_num(gap)} SP để đạt</div>
-        </div>
-        """, unsafe_allow_html=True)
+col_kpi, col_insight = st.columns([3, 1])
 
-    # 2. BIỂU ĐỒ & INSIGHT
-    c_chart_s, c_text_s = st.columns([2, 1])
+with col_kpi:
+    c1, c2, c3 = st.columns(3)
+    def card(c, lbl, v, s):
+        c.markdown(f"""<div class="glass-box" style="text-align:center">
+            <div style="font-size:12px; color:#aaa">{lbl}</div>
+            <div style="font-size:28px; font-weight:bold; color:#fff">{v:,.0f}</div>
+            <div style="font-size:14px; color:{PRIMARY}">{s}</div>
+        </div>""", unsafe_allow_html=True)
     
-    with c_chart_s:
-        # Biểu đồ Donut 70/30
-        fig_mix = px.pie(mix_data, values='sl', names='loai_mau', hole=0.6, 
-                         color='loai_mau',
-                         color_discrete_map={'Mẫu Cũ (Repeat)': PRIMARY, 'Mẫu Mới (New)': WARNING},
-                         title=f"Cơ cấu Sản lượng Năm {curr_year}")
-        st.plotly_chart(polish_chart(fig_mix), use_container_width=True)
-        
-        # Biểu đồ cột chồng theo tháng (Xem tháng nào làm nhiều mẫu mới quá)
-        mix_month = df_curr.groupby(['month', 'loai_mau'])['sl'].sum().reset_index()
-        fig_bar_mix = px.bar(mix_month, x='month', y='sl', color='loai_mau', 
-                             color_discrete_map={'Mẫu Cũ (Repeat)': PRIMARY, 'Mẫu Mới (New)': WARNING},
-                             title="Biến động Tỷ lệ Mẫu Mới/Cũ theo Tháng", barmode='stack')
-        st.plotly_chart(polish_chart(fig_bar_mix), use_container_width=True)
+    card(c1, f"TỔNG SẢN LƯỢNG {curr_year}", v_curr, f"{growth:+.1f}% so với năm trước")
+    card(c2, "TRUNG BÌNH THÁNG", avg_month, "Sản phẩm/tháng")
+    card(c3, "SỐ LƯỢNG SKU", df['ma_hang'].nunique(), "Mã hàng đang chạy")
 
-    with c_text_s:
-        # Tự động sinh Insight
-        status = "ỔN ĐỊNH" if new_perc <= 35 else "CẢNH BÁO RỦI RO"
-        msg_color = "success" if new_perc <= 35 else "warning"
-        
-        insight_strat = f"""
-        Hiện tại, tỷ lệ mẫu mới đang ở mức <span class='hl-warn'>{new_perc:.1f}%</span>. 
-        Trạng thái: <b style='color:{"#00E676" if new_perc<=35 else "#FFA726"}'>{status}</b>.
-        <br><br>
-        <b>Tại sao điều này quan trọng?</b><br>
-        Việc giữ mẫu mới dưới 35% giúp dây chuyền tại <b>Xưởng 1</b> hoạt động liên tục, giảm thời gian chết do chuyển đổi mã hàng.
-        <br><br>
-        <b>Hành động khuyến nghị:</b><br>
-        Nếu tỷ lệ này vượt quá 40% trong tháng tới, cần:
-        1. Tạm dừng nhận mẫu R&D mới.
-        2. Đàm phán với khách hàng dời lịch giao mẫu.
-        3. Ưu tiên chạy các đơn hàng lặp lại (Repeat Order) để bù sản lượng.
-        """
-        generate_insight_box("Giám sát Chiến lược", insight_strat, msg_color)
-        
-        generate_insight_box("Lưu ý từ Quá khứ (2023)", 
-                             "Bài học 2023: Chạy đua sản lượng + Quá nhiều mẫu mới = Mất kiểm soát chất lượng. <br>Năm nay kiên quyết giữ đúng tỷ lệ để bảo vệ uy tín.", 
-                             "danger")
-
-# --- TAB 2: HIỆU QUẢ SẢN XUẤT ---
-with tab2:
-    st.subheader("📊 Hiệu suất Vận hành")
-    
-    # Giả lập dữ liệu "Tiến độ" (Vì file excel ko có cột này, ta tạo giả lập để demo)
-    # Trong thực tế bạn sẽ lấy từ dữ liệu thật
-    df['status'] = np.random.choice(['Đúng tiến độ', 'Chậm tiến độ'], size=len(df), p=[0.85, 0.15])
-    
-    c_prod_1, c_prod_2 = st.columns([2, 1])
-    
-    with c_prod_1:
-        # Biểu đồ xu hướng sản lượng
-        ts_data = df.groupby('ym')['sl'].sum().reset_index().sort_values('ym')
-        fig_trend = go.Figure()
-        fig_trend.add_trace(go.Scatter(x=ts_data['ym'], y=ts_data['sl'], mode='lines', name='Sản lượng', 
-                                 line=dict(color=PRIMARY, width=3, shape='spline'),
-                                 fill='tozeroy', fillcolor='rgba(0, 230, 118, 0.1)'))
-        st.plotly_chart(polish_chart(fig_trend), use_container_width=True)
-        
-    with c_prod_2:
-        # Tỷ lệ Chậm tiến độ (Giả lập)
-        delay_counts = df['status'].value_counts(normalize=True) * 100
-        delay_rate = delay_counts.get('Chậm tiến độ', 0)
-        
-        fig_gauge = go.Figure(go.Indicator(
-            mode = "gauge+number",
-            value = delay_rate,
-            title = {'text': "Tỷ lệ Chậm tiến độ (Ước tính)"},
-            gauge = {'axis': {'range': [None, 100]},
-                     'bar': {'color': DANGER},
-                     'threshold': {'line': {'color': "white", 'width': 4}, 'thickness': 0.75, 'value': 10}}))
-        fig_gauge.update_layout(paper_bgcolor='rgba(0,0,0,0)', font={'color': "white"})
-        st.plotly_chart(fig_gauge, use_container_width=True)
-        
-        generate_insight_box("Nguyên nhân Chậm trễ", 
-                             "Phần lớn các đơn hàng chậm tiến độ tập trung vào nhóm <b>Mẫu Mới</b> do thời gian set-up máy lâu và công nhân chưa quen thao tác.", 
-                             "warning")
-
-# --- TAB 3: SẢN PHẨM & MÙA VỤ ---
-with tab3:
-    st.subheader("🎨 Phân tích Sản phẩm & Mùa vụ")
-    c3_1, c3_2 = st.columns(2)
-    with c3_1:
-        # Heatmap
-        heat = df.groupby(['month', 'year'])['sl'].sum().reset_index()
-        heat_pivot = heat.pivot(index='month', columns='year', values='sl').fillna(0)
-        fig_h = px.imshow(heat_pivot, aspect="auto", color_continuous_scale='Greens', title="Bản đồ nhiệt Sản lượng")
-        st.plotly_chart(polish_chart(fig_h), use_container_width=True)
-    with c3_2:
-        # Top Products
-        top_sku = df.groupby('ma_hang')['sl'].sum().nlargest(10).reset_index()
-        fig_sku = px.bar(top_sku, x='sl', y='ma_hang', orientation='h', color='sl', title="Top 10 Mã hàng chủ lực")
-        st.plotly_chart(polish_chart(fig_sku), use_container_width=True)
-
-# --- TAB 4: DỮ LIỆU ---
-with tab4:
-    st.subheader("📋 Dữ liệu Chi tiết")
-    gb = GridOptionsBuilder.from_dataframe(df)
-    gb.configure_pagination()
-    gb.configure_selection('multiple', use_checkbox=True)
-    gridOptions = gb.build()
-    st.markdown('<div class="glass-box">', unsafe_allow_html=True)
-    AgGrid(df, gridOptions=gridOptions, height=500, theme='alpine-dark')
-    st.markdown('</div>', unsafe_allow_html=True)
+with col_insight:
+    msg = f"Năm <b>{curr_year}</b> đang ghi nhận mức tăng trưởng <span class='{'highlight' if growth>0 else 'danger'}'>{growth:+.1f}%</span>. "
+    msg += "Điều này cho thấy nhu cầu thị trường đang phục hồi tốt." if growth > 0 else "Cần rà soát lại nguyên nhân sụt giảm đơn hàng."
+    generate_insight_box("Đánh giá Tăng trưởng", msg, "success" if growth > 0 else "danger")
 
 st.markdown("---")
-st.caption(f"© 2026 Mộc Phát Furniture | Strategic Dashboard for Ms. Ngoc | Built by Ly (Data Analyst)")
+
+# ==========================================
+# 5. PHÂN TÍCH CHUYÊN SÂU
+# ==========================================
+tab1, tab2, tab3 = st.tabs(["📊 NHỊP ĐẬP MÙA VỤ", "🎨 CHIẾN LƯỢC SẢN PHẨM", "⚖️ QUẢN TRỊ RỦI RO"])
+
+# --- TAB 1: MÙA VỤ ---
+with tab1:
+    c_chart, c_text = st.columns([2, 1])
+    with c_chart:
+        # Biểu đồ Heatmap
+        heat = df.groupby(['month', 'year'])['sl'].sum().reset_index()
+        heat_pivot = heat.pivot(index='month', columns='year', values='sl').fillna(0)
+        fig_h = px.imshow(heat_pivot, aspect="auto", color_continuous_scale='Greens', title="Bản đồ nhiệt Sản lượng theo Tháng")
+        st.plotly_chart(polish_chart(fig_h), use_container_width=True)
+    
+    with c_text:
+        # Tự động tìm tháng cao điểm
+        avg_monthly = df.groupby('month')['sl'].mean()
+        peak_month = avg_monthly.idxmax()
+        low_month = avg_monthly.idxmin()
+        peak_val = avg_monthly.max()
+        
+        insight_season = f"""
+        Theo dữ liệu lịch sử, <b>Tháng {peak_month}</b> luôn là tháng đạt đỉnh sản lượng trung bình ({peak_val:,.0f} SP).<br><br>
+        Trong khi đó, <b>Tháng {low_month}</b> thường là vùng trũng. <br><br>
+        👉 <b>Khuyến nghị:</b> <br>
+        - Lên kế hoạch nhập nguyên vật liệu từ <b>Tháng {peak_month-2 if peak_month>2 else 12}</b> để đón đầu sóng.
+        - Tận dụng tháng thấp điểm để bảo trì máy móc và đào tạo nhân sự.
+        """
+        generate_insight_box("Quy luật Mùa vụ", insight_season, "info")
+
+# --- TAB 2: SẢN PHẨM ---
+with tab2:
+    c_prod_1, c_prod_2 = st.columns([1, 1])
+    
+    with c_prod_1:
+        st.markdown("##### 🎨 Xu hướng Màu sắc")
+        color_trend = df.groupby('nhom_mau')['sl'].sum().reset_index().sort_values('sl', ascending=False)
+        fig_c = px.pie(color_trend, values='sl', names='nhom_mau', hole=0.5, color_discrete_sequence=px.colors.qualitative.Pastel)
+        st.plotly_chart(polish_chart(fig_c), use_container_width=True)
+        
+        top_color = color_trend.iloc[0]
+        insight_color = f"""
+        Thị trường đang chuộng nhóm màu <b>{top_color['nhom_mau']}</b>, chiếm tỷ trọng chủ đạo.
+        Các nhóm màu khác cần được xem xét lại nếu tồn kho cao.
+        """
+        generate_insight_box("Thị hiếu Thẩm mỹ", insight_color, "warning")
+
+    with c_prod_2:
+        st.markdown("##### 🔌 Phân tích Tính năng (USB)")
+        usb_trend = df.groupby(['year', 'is_usb_clean'])['sl'].sum().reset_index()
+        fig_u = px.bar(usb_trend, x='year', y='sl', color='is_usb_clean', barmode='group', 
+                       color_discrete_map={'Có USB': WARNING, 'Không USB': '#424242'})
+        st.plotly_chart(polish_chart(fig_u), use_container_width=True)
+        
+        # Logic USB Growth
+        u_curr = usb_trend[(usb_trend['year']==curr_year) & (usb_trend['is_usb_clean']=='Có USB')]['sl'].sum()
+        u_prev = usb_trend[(usb_trend['year']==curr_year-1) & (usb_trend['is_usb_clean']=='Có USB')]['sl'].sum()
+        u_growth = ((u_curr - u_prev)/u_prev*100) if u_prev>0 else 0
+        
+        insight_usb = f"""
+        Dòng sản phẩm tích hợp USB đang tăng trưởng <b>{u_growth:+.1f}%</b>. 
+        Đây là tín hiệu cho thấy khách hàng ngày càng quan tâm đến tính năng công nghệ tiện ích.
+        """
+        generate_insight_box("Động lực Công nghệ", insight_usb, "success" if u_growth > 0 else "danger")
+
+# --- TAB 3: QUẢN TRỊ RỦI RO (PARETO) ---
+with tab3:
+    col_pareto, col_risk = st.columns([2, 1])
+    
+    with col_pareto:
+        cust_data = df.groupby('khach_hang')['sl'].sum().sort_values(ascending=False).reset_index()
+        cust_data['cum_perc'] = (cust_data['sl'].cumsum() / cust_data['sl'].sum()) * 100
+        
+        fig_p = go.Figure()
+        fig_p.add_trace(go.Bar(x=cust_data['khach_hang'].head(10), y=cust_data['sl'].head(10), name='Sản lượng', marker_color=PRIMARY))
+        fig_p.add_trace(go.Scatter(x=cust_data['khach_hang'].head(10), y=cust_data['cum_perc'].head(10), name='% Tích lũy', yaxis='y2', line=dict(color=DANGER, width=2)))
+        fig_p.update_layout(yaxis2=dict(overlaying='y', side='right', range=[0, 110]), showlegend=False, title="Biểu đồ Pareto (Top 10 Khách hàng)")
+        st.plotly_chart(polish_chart(fig_p), use_container_width=True)
+        
+    with col_risk:
+        top_3_share = cust_data.head(3)['sl'].sum() / cust_data['sl'].sum() * 100
+        top1_name = cust_data.iloc[0]['khach_hang']
+        
+        risk_level = "CAO" if top_3_share > 60 else "TRUNG BÌNH" if top_3_share > 40 else "THẤP"
+        risk_color = "danger" if top_3_share > 60 else "warning" if top_3_share > 40 else "success"
+        
+        insight_risk = f"""
+        Top 3 khách hàng lớn nhất đang nắm giữ <span class='highlight'>{top_3_share:.1f}%</span> tổng sản lượng.
+        <br>Trong đó, <b>{top1_name}</b> là đối tác chi phối lớn nhất.<br><br>
+        ⚠️ <b>Mức độ rủi ro phụ thuộc: {risk_level}</b>.<br>
+        Cần mở rộng tệp khách hàng mới để giảm thiểu rủi ro nếu một trong các Key Account này cắt giảm đơn hàng.
+        """
+        generate_insight_box("Rủi ro Tập trung", insight_risk, risk_color)
+
+st.markdown("---")
+st.caption(f"© 2026 Mộc Phát Strategy Hub | Generated at: {datetime.now().strftime('%H:%M %d/%m/%Y')}")
