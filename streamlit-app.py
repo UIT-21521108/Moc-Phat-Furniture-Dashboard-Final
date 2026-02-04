@@ -9,7 +9,7 @@ from datetime import datetime
 from st_aggrid import AgGrid, GridOptionsBuilder
 
 # ==========================================
-# 1. CẤU HÌNH GIAO DIỆN (DEEP AURORA GLASS)
+# 1. CẤU HÌNH GIAO DIỆN (DEEP AURORA - DASHBOARD PRO)
 # ==========================================
 st.set_page_config(page_title="Mộc Phát Analytics Pro", layout="wide", page_icon="🌲")
 
@@ -21,13 +21,11 @@ TEXT_SUB = "#E0E0E0"
 GRID_COLOR = "rgba(255, 255, 255, 0.08)"
 
 # --- CSS VISUAL EFFECTS ---
-# Sử dụng {{ }} để escape dấu ngoặc nhọn trong f-string
 st.markdown(f"""
 <style>
-    /* 1. NỀN DEEP AURORA (ÁNH XANH HUYỀN ẢO) */
+    /* 1. NỀN DEEP AURORA */
     .stApp {{
         background-color: #050505;
-        /* Tạo 2 luồng ánh sáng xanh lục và xanh dương giao thoa trên nền tối */
         background-image: 
             radial-gradient(circle at 15% 50%, rgba(0, 230, 118, 0.08) 0%, transparent 50%),
             radial-gradient(circle at 85% 30%, rgba(41, 121, 255, 0.06) 0%, transparent 50%);
@@ -35,14 +33,12 @@ st.markdown(f"""
         background-size: cover;
     }}
 
-    /* 2. HEADER VÔ HÌNH (NO FRAME) */
+    /* 2. HEADER VÔ HÌNH (Floating) */
     .header-container {{
         text-align: center;
         padding: 40px 0 20px 0;
         margin-bottom: 30px;
-        /* Không có viền, không có nền, chỉ có ánh sáng */
     }}
-    
     .glow-logo {{
         filter: drop-shadow(0 0 20px {PRIMARY_NEON});
         transition: transform 0.5s ease;
@@ -57,40 +53,36 @@ st.markdown(f"""
         margin-top: 15px;
         text-transform: uppercase;
         letter-spacing: 2px;
-        /* Soft Glow: Bóng tỏa nhẹ, không gắt */
         text-shadow: 
             0 0 10px rgba(0, 230, 118, 0.6),
             0 0 30px rgba(0, 230, 118, 0.2);
     }}
-    
     .sub-title {{
         font-size: 14px; color: {TEXT_SUB}; letter-spacing: 4px; font-weight: 300;
-        text-shadow: 0 2px 4px rgba(0,0,0,0.8);
-        opacity: 0.9;
+        text-shadow: 0 2px 4px rgba(0,0,0,0.8); opacity: 0.9;
     }}
 
-    /* 3. SUBHEADERS (Tiêu đề phụ nổi bật) */
+    /* 3. SUBHEADERS */
     h3 {{
         color: #fff !important;
-        font-size: 24px !important;
+        font-size: 20px !important;
         font-weight: 700 !important;
-        /* Bóng chữ tạo độ nổi 3D tách biệt khỏi nền */
         text-shadow: 0 4px 10px rgba(0,0,0,1); 
         border-left: 4px solid {PRIMARY_NEON};
         padding-left: 15px;
-        margin-top: 35px !important;
-        margin-bottom: 20px !important;
+        margin-top: 25px !important;
+        margin-bottom: 15px !important;
     }}
 
-    /* 4. GLASSMORPHISM CARDS (KHUNG KÍNH MỜ) */
+    /* 4. GLASS CARDS */
     .glass-card {{
-        background: rgba(255, 255, 255, 0.03); /* Nền cực trong */
-        backdrop-filter: blur(16px);           /* Làm mờ hậu cảnh mạnh */
+        background: rgba(255, 255, 255, 0.03);
+        backdrop-filter: blur(16px);
         -webkit-backdrop-filter: blur(16px);
-        border: 1px solid rgba(255, 255, 255, 0.08); /* Viền kính mỏng */
+        border: 1px solid rgba(255, 255, 255, 0.08);
         border-radius: 20px;
         padding: 24px;
-        box-shadow: 0 4px 30px rgba(0, 0, 0, 0.2); /* Bóng sâu */
+        box-shadow: 0 4px 30px rgba(0, 0, 0, 0.2);
         transition: all 0.3s ease;
     }}
     .glass-card:hover {{
@@ -100,7 +92,7 @@ st.markdown(f"""
         box-shadow: 0 10px 40px rgba(0, 230, 118, 0.1);
     }}
 
-    /* 5. GOLD CARD (Cho phần Kế hoạch - Giữ nguyên như bạn thích) */
+    /* 5. GOLD CARD */
     .gold-glass-card {{
         background: linear-gradient(135deg, rgba(255, 167, 38, 0.15), rgba(245, 124, 0, 0.05));
         backdrop-filter: blur(16px);
@@ -110,11 +102,10 @@ st.markdown(f"""
         box-shadow: 0 10px 40px rgba(255, 167, 38, 0.1);
     }}
 
-    /* Typography trong Card */
-    .kpi-lbl {{ font-size: 13px; color: {TEXT_SUB}; text-transform: uppercase; letter-spacing: 1px; font-weight: 600; opacity: 0.9; }}
+    .kpi-lbl {{ font-size: 13px; color: {TEXT_SUB}; text-transform: uppercase; letter-spacing: 1px; font-weight: 600; }}
     .kpi-val {{ font-size: 36px; font-weight: 800; color: #fff; margin: 8px 0; text-shadow: 0 2px 5px rgba(0,0,0,0.5); }}
 
-    /* 6. TABS & AGGRID TRONG SUỐT */
+    /* 6. TABS & AGGRID */
     .stTabs [data-baseweb="tab-list"] {{ gap: 15px; }}
     .stTabs [data-baseweb="tab"] {{ 
         background-color: rgba(255,255,255,0.02); 
@@ -131,16 +122,15 @@ st.markdown(f"""
         font-weight: bold;
     }}
 
-    /* Chart Container (Bọc biểu đồ vào kính) */
     .chart-box {{
         background: rgba(255, 255, 255, 0.02);
         backdrop-filter: blur(12px);
         border-radius: 20px;
         border: 1px solid rgba(255, 255, 255, 0.05);
         padding: 15px;
+        height: 100%; /* Full height */
     }}
 
-    /* AgGrid Dark Transparent */
     .ag-theme-alpine-dark {{
         --ag-background-color: transparent !important;
         --ag-header-background-color: rgba(255,255,255,0.05) !important;
@@ -152,7 +142,7 @@ st.markdown(f"""
 </style>
 """, unsafe_allow_html=True)
 
-# --- HÀM STYLE BIỂU ĐỒ (TRANSPARENT) ---
+# --- HÀM STYLE BIỂU ĐỒ ---
 def polish_chart(fig):
     fig.update_layout(
         template="plotly_dark",
@@ -162,7 +152,6 @@ def polish_chart(fig):
         margin=dict(t=40, b=20, l=10, r=10),
         hovermode="x unified"
     )
-    # Lưới sáng hơn chút để nổi trên nền kính
     fig.update_xaxes(showgrid=False, linecolor=GRID_COLOR)
     fig.update_yaxes(showgrid=True, gridcolor=GRID_COLOR, zerolinecolor=GRID_COLOR)
     return fig
@@ -184,6 +173,9 @@ def load_data():
         df = df[(df['year'] > 2020) & (df['month'].between(1, 12))]
         df['ym'] = pd.to_datetime(df.assign(day=1)[['year', 'month', 'day']])
         
+        # Tạo cột Quý
+        df['quarter'] = df['month'].apply(lambda x: f"Q{(x-1)//3 + 1}")
+
         season_map = {12:'Đông', 1:'Đông', 2:'Đông', 3:'Xuân', 4:'Xuân', 5:'Xuân', 
                       6:'Hè', 7:'Hè', 8:'Hè', 9:'Thu', 10:'Thu', 11:'Thu'}
         df['mua'] = df['month'].map(season_map)
@@ -217,18 +209,16 @@ df_raw, error = load_data()
 if error: st.error(error); st.stop()
 
 # ==========================================
-# 3. HEADER (INVISIBLE & SOFT NEON)
+# 3. HEADER
 # ==========================================
 def get_base64_logo(path):
     if os.path.exists(path):
-        with open(path, "rb") as f:
-            return base64.b64encode(f.read()).decode()
+        with open(path, "rb") as f: return base64.b64encode(f.read()).decode()
     return None
 
 logo_b64 = get_base64_logo("mocphat_logo.png")
 logo_img = f'<img src="data:image/png;base64,{logo_b64}" height="80" class="glow-logo">' if logo_b64 else '<span style="font-size:70px">🌲</span>'
 
-# Header container: Không khung, chỉ có chữ nổi trên nền Aurora
 st.markdown(f"""
 <div class="header-container">
     {logo_img}
@@ -248,7 +238,7 @@ if sel_cust: df = df[df['khach_hang'].isin(sel_cust)]
 if df.empty: st.warning("Không có dữ liệu!"); st.stop()
 
 # ==========================================
-# 4. KPI CARDS (GLASS EFFECT)
+# 4. KPI CARDS
 # ==========================================
 st.subheader("🚀 Hiệu quả Kinh doanh")
 vol_by_year = df.groupby('year')['sl'].sum()
@@ -262,8 +252,6 @@ def kpi_card(col, lbl, val, sub_val, sub_lbl):
     val_str = f"{val:,.0f}" 
     color = PRIMARY_NEON if sub_val >= 0 else "#FF5252"
     icon = "▲" if sub_val >= 0 else "▼"
-    
-    # Sử dụng class "glass-card"
     col.markdown(f"""
     <div class="glass-card">
         <div class="kpi-lbl">{lbl}</div>
@@ -282,13 +270,12 @@ kpi_card(c4, "ĐỐI TÁC KHÁCH HÀNG", df['khach_hang'].nunique(), 0, "Active"
 st.markdown("---")
 
 # ==========================================
-# 5. TABS PHÂN TÍCH (GLASS CONTAINERS)
+# 5. TABS PHÂN TÍCH
 # ==========================================
 tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
     "📊 TỔNG QUAN", "🎯 KẾ HOẠCH 2026", "🎨 SỨC KHỎE SP", "🌡️ MÙA VỤ", "⚖️ KHÁCH HÀNG", "📋 DỮ LIỆU"
 ])
 
-# Hàm render AgGrid trong khung kính
 def render_glass_aggrid(dataframe, height=400):
     gb = GridOptionsBuilder.from_dataframe(dataframe)
     gb.configure_pagination(paginationAutoPageSize=True)
@@ -297,56 +284,68 @@ def render_glass_aggrid(dataframe, height=400):
     for col in dataframe.select_dtypes(include=['number']).columns:
         gb.configure_column(col, type=["numericColumn", "numberColumnFilter"], precision=0)
     gridOptions = gb.build()
-    
     st.markdown('<div class="chart-box">', unsafe_allow_html=True)
     AgGrid(dataframe, gridOptions=gridOptions, height=height, theme='alpine-dark', enable_enterprise_modules=False)
     st.markdown('</div>', unsafe_allow_html=True)
 
-# --- TAB 1: TỔNG QUAN ---
+# --- TAB 1: TỔNG QUAN (DASHBOARD PRO) ---
 with tab1:
-    c1_left, c1_right = st.columns([3, 1])
-    with c1_left:
-        st.subheader("📈 Xu hướng & Phát hiện Bất thường")
-        ts_data = df.groupby('ym')['sl'].sum().reset_index().sort_values('ym')
-        
-        fig = go.Figure()
-        fig.add_trace(go.Scatter(x=ts_data['ym'], y=ts_data['sl'], mode='lines+markers', name='Thực tế', 
-                                 line=dict(color=PRIMARY_NEON, width=3, shape='spline'),
-                                 fill='tozeroy', fillcolor='rgba(0, 230, 118, 0.15)')) 
-        ts_data['ma3'] = ts_data['sl'].rolling(window=3).mean()
-        fig.add_trace(go.Scatter(x=ts_data['ym'], y=ts_data['ma3'], mode='lines', name='TB 3 tháng', line=dict(color='#FFA726', dash='dot')))
-        
-        std = ts_data['sl'].rolling(window=3).std()
-        upper = ts_data['ma3'] + (1.8 * std)
-        anomalies = ts_data[ts_data['sl'] > upper]
-        if not anomalies.empty:
-            fig.add_trace(go.Scatter(x=anomalies['ym'], y=anomalies['sl'], mode='markers', name='Đột biến', 
-                                     marker=dict(color='#FF5252', size=14, symbol='star', line=dict(color='white', width=1))))
-        
-        # Bọc biểu đồ trong khung kính
+    # 1. BIỂU ĐỒ XU HƯỚNG LỚN
+    st.subheader("📈 Diễn biến Thị trường")
+    ts_data = df.groupby('ym')['sl'].sum().reset_index().sort_values('ym')
+    fig_trend = go.Figure()
+    fig_trend.add_trace(go.Scatter(x=ts_data['ym'], y=ts_data['sl'], mode='lines', name='Sản lượng', 
+                             line=dict(color=PRIMARY_NEON, width=3, shape='spline'),
+                             fill='tozeroy', fillcolor='rgba(0, 230, 118, 0.1)')) 
+    # Thêm đường xu hướng
+    ts_data['ma3'] = ts_data['sl'].rolling(window=3).mean()
+    fig_trend.add_trace(go.Scatter(x=ts_data['ym'], y=ts_data['ma3'], mode='lines', name='TB 3 tháng', line=dict(color='#FFA726', dash='dot')))
+    
+    st.markdown('<div class="chart-box">', unsafe_allow_html=True)
+    st.plotly_chart(polish_chart(fig_trend), use_container_width=True)
+    st.markdown('</div>', unsafe_allow_html=True)
+    
+    # 2. HÀNG 2: TOP KHÁCH & NHÓM MÀU
+    c1_1, c1_2 = st.columns(2)
+    with c1_1:
+        st.subheader("🏆 Top 5 Đối tác chiến lược")
+        top_cust = df.groupby('khach_hang')['sl'].sum().nlargest(5).sort_values(ascending=True).reset_index()
+        fig_cust = px.bar(top_cust, x='sl', y='khach_hang', orientation='h', text_auto='.2s', color='sl', color_continuous_scale='Greens')
         st.markdown('<div class="chart-box">', unsafe_allow_html=True)
-        st.plotly_chart(polish_chart(fig), use_container_width=True)
+        st.plotly_chart(polish_chart(fig_cust), use_container_width=True)
         st.markdown('</div>', unsafe_allow_html=True)
-
-    with c1_right:
-        if not ts_data.empty:
-            last_m = ts_data.iloc[-1]
-            prev_m = ts_data.iloc[-2] if len(ts_data) > 1 else last_m
-            mom = ((last_m['sl'] - prev_m['sl'])/prev_m['sl']*100) if prev_m['sl']>0 else 0
-            sl_fmt = f"{last_m['sl']:,.0f}"
-            
-            # Insight box dùng glass-card
-            st.subheader("💡 Phân tích nhanh")
-            st.markdown(f"""
-            <div class="glass-card" style="border-left: 3px solid {PRIMARY_NEON}">
-                <div style="font-size:15px; color:#fff; line-height:1.8">
-                • Tháng <b>{last_m['ym'].strftime('%m/%Y')}</b>: <br>
-                  <span style="font-size:24px; font-weight:bold; color:#fff">{sl_fmt}</span> SP<br>
-                • Biến động: <b style="color:{PRIMARY_NEON if mom>0 else '#FF5252'}">{mom:+.1f}%</b>.<br>
-                • Phát hiện <b style="color:#FFA726">{len(anomalies)}</b> bất thường.
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
+        
+    with c1_2:
+        st.subheader("🎨 Cơ cấu Nhóm màu")
+        grp_color = df.groupby('nhom_mau')['sl'].sum().reset_index()
+        fig_donut = px.pie(grp_color, values='sl', names='nhom_mau', hole=0.6, color_discrete_sequence=px.colors.qualitative.Pastel)
+        st.markdown('<div class="chart-box">', unsafe_allow_html=True)
+        st.plotly_chart(polish_chart(fig_donut), use_container_width=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+    
+    # 3. HÀNG 3: KHU VỰC & QUÝ
+    c1_3, c1_4 = st.columns(2)
+    with c1_3:
+        st.subheader("🗺️ Phân bổ Khu vực (Treemap)")
+        # Nếu chưa có dữ liệu khu vực chuẩn, dùng nhóm màu làm ví dụ (hoặc thay bằng khu_vuc nếu data có)
+        # Ở đây giả định dùng 'nhom_mau' và 'mau_son' để demo Treemap đẹp mắt
+        treemap_data = df.groupby(['nhom_mau', 'mau_son'])['sl'].sum().reset_index()
+        treemap_data = treemap_data[treemap_data['sl'] > treemap_data['sl'].sum()*0.01] # Filter nhỏ
+        fig_tree = px.treemap(treemap_data, path=['nhom_mau', 'mau_son'], values='sl', color='nhom_mau', color_discrete_sequence=px.colors.qualitative.Set2)
+        
+        st.markdown('<div class="chart-box">', unsafe_allow_html=True)
+        st.plotly_chart(polish_chart(fig_tree), use_container_width=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+        
+    with c1_4:
+        st.subheader("📊 Hiệu suất theo Quý (YoY)")
+        q_data = df.groupby(['year', 'quarter'])['sl'].sum().reset_index()
+        fig_q = px.bar(q_data, x='quarter', y='sl', color='year', barmode='group', 
+                       color_continuous_scale='Greens') # Tự động map màu theo năm
+        
+        st.markdown('<div class="chart-box">', unsafe_allow_html=True)
+        st.plotly_chart(polish_chart(fig_q), use_container_width=True)
+        st.markdown('</div>', unsafe_allow_html=True)
 
 # --- TAB 2: KẾ HOẠCH 2026 ---
 with tab2:
@@ -368,7 +367,7 @@ with tab2:
         v_gap = f"{sl_2026_target - sl_2025_total:,.0f}"
         
         with col_info:
-            # SỬ DỤNG CLASS GOLD-GLASS-CARD (VÀNG GRADIENT)
+            # GOLD GLASS CARD
             st.markdown(f"""
             <div class="gold-glass-card" style="display:flex; justify-content:space-around; align-items:center;">
                 <div style="text-align:center"><div style="font-size:13px; color:#ddd; font-weight:600">2025 BASE</div><div style="font-size:28px; font-weight:bold; color:#fff">{v25}</div></div>
