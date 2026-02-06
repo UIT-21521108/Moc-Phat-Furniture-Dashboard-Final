@@ -23,6 +23,7 @@ TEXT_SUB = "#E0E0E0"
 GRID_COLOR = "rgba(255, 255, 255, 0.1)"
 
 # --- CSS VISUAL EFFECTS ---
+# Lưu ý: Trong f-string, dấu { của CSS phải viết là {{
 st.markdown(f"""
 <style>
     /* 1. NỀN DEEP AURORA */
@@ -81,14 +82,14 @@ st.markdown(f"""
         height: 100%;
     }}
 
-    /* AGGRID THEME OVERRIDE */
-    .ag-theme-alpine-dark {
+    /* AGGRID THEME OVERRIDE - Đã sửa lỗi ngoặc nhọn */
+    .ag-theme-alpine-dark {{
         --ag-background-color: transparent !important;
         --ag-header-background-color: rgba(255,255,255,0.05) !important;
         --ag-odd-row-background-color: rgba(255,255,255,0.02) !important;
         --ag-foreground-color: #E0E0E0 !important;
         --ag-border-color: rgba(255,255,255,0.1) !important;
-    }
+    }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -105,7 +106,7 @@ def polish_chart(fig):
     fig.update_yaxes(showgrid=True, gridcolor=GRID_COLOR, zerolinecolor=GRID_COLOR)
     return fig
 
-# --- HÀM RENDER AGGRID (ĐÃ BỔ SUNG LẠI) ---
+# --- HÀM RENDER AGGRID ---
 def render_glass_aggrid(dataframe, height=400):
     gb = GridOptionsBuilder.from_dataframe(dataframe)
     gb.configure_pagination(paginationAutoPageSize=True)
@@ -378,7 +379,6 @@ with tab4:
         growth_cust = ((v_c - v_p)/v_p*100).fillna(0).sort_values(ascending=False).reset_index()
         growth_cust.columns = ['Khách Hàng', '% Tăng']
         
-        # SỬA LỖI: Gọi hàm render_glass_aggrid đã được định nghĩa
         render_glass_aggrid(growth_cust.head(10), height=400)
 
 # --- TAB 5: DỮ LIỆU ---
