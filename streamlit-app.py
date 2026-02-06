@@ -1,6 +1,5 @@
-# app.py — Moc Phat Dashboard v2.0 (Strategic Edition)
-# Kế thừa: Brand xanh, Sticky header, Insight text
-# Phát triển: Ma trận SKU (Runner/Stranger), Mô phỏng kịch bản (What-if), Cross-filtering
+# app.py — Moc Phat Dashboard v2.1 (Strategic Edition - Fixed Region Logic)
+# Phiên bản hoàn chỉnh: Brand xanh, SKU Matrix, What-if, Cross-filtering, Fix lỗi biểu đồ vùng
 
 import os, base64
 import streamlit as st
@@ -8,11 +7,10 @@ import pandas as pd
 import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
-from io import BytesIO
 from datetime import datetime
 
 # =========================
-# 1. CONFIG & CSS (Giữ nguyên Brand Identity)
+# 1. CONFIG & CSS (Brand Identity)
 # =========================
 st.set_page_config(page_title="Mộc Phát Strategic Hub", layout="wide", page_icon="🌲")
 
@@ -24,7 +22,7 @@ COLOR_PALETTE = {
     "NATURAL": "#C4A484", "PINK": "#E57373", "YELLOW": "#FBC02D",
     "RED": "#D32F2F", "OTHER": "#BDBDBD"
 }
-PLOT_TEMPLATE = 'plotly_white' # Dùng nền trắng cho sạch, chuyên nghiệp
+PLOT_TEMPLATE = 'plotly_white'
 
 st.markdown(f"""
 <style>
@@ -68,7 +66,7 @@ h1,h2,h3,h4 {{ font-weight:800 !important; letter-spacing: -0.5px; }}
 """, unsafe_allow_html=True)
 
 # =========================
-# 2. LOGIC XỬ LÝ DỮ LIỆU (Nâng cấp)
+# 2. LOGIC XỬ LÝ DỮ LIỆU (FIXED)
 # =========================
 @st.cache_data(show_spinner=False)
 def load_and_process(file):
@@ -83,38 +81,42 @@ def load_and_process(file):
     for c in ['sl','sl_container','month','year']:
         if c in df.columns: df[c] = pd.to_numeric(df[c], errors='coerce').fillna(0)
     
-    df = df[df['year'] > 0] # Lọc rác
+    df = df[df['year'] > 0] 
     df['ym'] = pd.to_datetime(df['year'].astype(int).astype(str) + '-' + df['month'].astype(int).astype(str) + '-01')
     
-    # --- LOGIC NÂNG CAO 1: Phân loại USB & Phụ kiện ---
+    # --- LOGIC 1: Phân loại USB ---
     df['is_usb'] = df['ma_hang'].fillna('').str.contains('USB', case=False) | \
                    df['mo_ta'].fillna('').str.contains('USB', case=False)
     
-    # --- LOGIC NÂNG CAO 2: Phân loại Màu ---
+    # --- LOGIC 2: Phân loại Màu ---
     def categorize_color(v):
         v = str(v).upper()
         for k, hex_val in COLOR_PALETTE.items():
             if k in v: return k
-            # Mapping thêm các từ khóa phụ
             if k=="BROWN" and any(x in v for x in ["COCOA","BRONZE","WALNUT"]): return "BROWN"
             if k=="WHITE" and any(x in v for x in ["CREAM","IVORY","WASH"]): return "WHITE"
             if k=="NATURAL" and any(x in v for x in ["OAK","HONEY"]): return "NATURAL"
         return "OTHER"
     
-    df['nhom_mau'] = df['mau_son'].apply(categorize_color)
+    df['nhom_mau'] = df['mau_son'].apply(categorize_color) if 'mau_son' in df.columns else "OTHER"
+
+    # --- LOGIC 3 (FIXED): Phân loại Khu vực ---
+    # Logic: Dựa vào tên khách hàng để đoán thị trường
+    def categorize_region(cust_name):
+        c = str(cust_name).upper()
+        if any(x in c for x in ['TJX', 'MARSHALL', 'HOMEGOODS', 'HOMESENSE', 'WINNERS', 'MMX']): return 'Bắc Mỹ'
+        if any(x in c for x in ['EUROPE', 'TK', 'UK', 'GERMANY']): return 'Châu Âu'
+        return 'Khác' 
+
+    df['khu_vuc'] = df['khach_hang'].apply(categorize_region) if 'khach_hang' in df.columns else "Khác"
     
-    # --- LOGIC NÂNG CAO 3: Ma trận SKU (Supply Chain Matrix) ---
-    # Tính Frequency (Số tháng xuất hiện đơn hàng) & Volume
+    # --- LOGIC 4: Ma trận SKU ---
     sku_stats = df.groupby('ma_hang').agg(
         total_vol=('sl', 'sum'),
-        freq=('ym', 'nunique') # Số tháng có đơn
+        freq=('ym', 'nunique') 
     ).reset_index()
     
-    # Phân loại Runner (Chạy đều, SL lớn) / Repeater (Lặp lại) / Stranger (Lạ, ít)
-    # Ngưỡng: freq >= 6 tháng/năm là đều (giả định dữ liệu > 1 năm)
-    # Vol: Top 20% sản lượng
     vol_80 = sku_stats['total_vol'].quantile(0.8)
-    freq_med = sku_stats['freq'].median()
     
     def classify_sku(row):
         if row['total_vol'] >= vol_80 and row['freq'] >= 4: return "RUNNER (Trụ cột)"
@@ -127,11 +129,11 @@ def load_and_process(file):
     return df
 
 # =========================
-# 3. VISUALIZATION FUNCTIONS (Nâng cấp Interactivity)
+# 3. VISUALIZATION FUNCTIONS
 # =========================
 
 def plot_kpi_modern(df):
-    """Hiển thị KPI dạng custom HTML/CSS thay vì st.metric chuẩn"""
+    """Hiển thị KPI dạng custom HTML/CSS"""
     now_year = df['year'].max()
     prev_year = now_year - 1
     
@@ -139,12 +141,11 @@ def plot_kpi_modern(df):
     v_prev = df[df['year']==prev_year]['sl'].sum()
     delta = (v_now - v_prev) / v_prev * 100 if v_prev else 0
     
-    # Tính thêm: Số container (giả định trung bình nếu thiếu data)
     cont_now = df[df['year']==now_year]['sl_container'].sum()
     
     cols = st.columns(4)
     
-    # KPI 1: Sản lượng Năm nay
+    # KPI 1: Sản lượng
     with cols[0]:
         cls = "delta-pos" if delta >= 0 else "delta-neg"
         icon = "▲" if delta >= 0 else "▼"
@@ -156,7 +157,7 @@ def plot_kpi_modern(df):
         </div>
         """, unsafe_allow_html=True)
         
-    # KPI 2: Số Container
+    # KPI 2: Container
     with cols[1]:
         st.markdown(f"""
         <div class="kpi-box">
@@ -189,8 +190,7 @@ def plot_kpi_modern(df):
         """, unsafe_allow_html=True)
 
 def plot_sku_matrix(df):
-    """Vẽ ma trận SKU: Volume vs Frequency (Scatter plot)"""
-    # Lấy dữ liệu 2024-2025 (gần nhất)
+    """Vẽ ma trận SKU: Volume vs Frequency"""
     recent = df[df['year'] >= df['year'].max()-1]
     stats = recent.groupby(['ma_hang', 'sku_class', 'nhom_mau']).agg(
         vol=('sl', 'sum'),
@@ -204,7 +204,7 @@ def plot_sku_matrix(df):
                          "REPEATER (Ổn định)": "#FFA726",
                          "STRANGER (Thời vụ/Mẫu mới)": "#9E9E9E"
                      },
-                     log_y=True, # Dùng log scale vì sản lượng chênh lệch lớn
+                     log_y=True, 
                      title="Ma trận Sản phẩm (Product Matrix)")
     
     fig.add_vline(x=4, line_dash="dash", line_color="grey", annotation_text="Ngưỡng ổn định")
@@ -230,7 +230,7 @@ def render_header():
             {logo_html}
             <div>
                 <h1 class="header-title">MỘC PHÁT ANALYTICS</h1>
-                <span class="header-badge">Strategic Edition v2.0</span>
+                <span class="header-badge">Strategic Edition v2.1</span>
             </div>
             <div style="flex-grow:1; text-align:right; font-weight:600; color:{PRIMARY}">
                 Dữ liệu cập nhật: {datetime.now().strftime('%d/%m/%Y')}
@@ -263,6 +263,10 @@ years = sorted(df['year'].unique(), reverse=True)
 sel_years = st.multiselect("Chọn Năm phân tích", years, default=years[:2])
 df_filtered = df[df['year'].isin(sel_years)]
 
+if df_filtered.empty:
+    st.warning("Không có dữ liệu cho năm đã chọn.")
+    st.stop()
+
 # --- DASHBOARD BODY ---
 
 # 1. KPI SECTION
@@ -274,7 +278,7 @@ tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "🎯 Ma trận Sản phẩm (SKU)", 
     "🌍 Khách hàng & Thị trường", 
     "🎨 Màu sắc & Xu hướng",
-    "🧪 Mô phỏng (What-if)"  # NEW FEATURE
+    "🧪 Mô phỏng (What-if)"
 ])
 
 # --- TAB 1: OVERVIEW ---
@@ -288,21 +292,26 @@ with tab1:
         st.plotly_chart(fig_trend, use_container_width=True)
         
         # Insight Text tự động
-        peak_month = monthly.loc[monthly['sl'].idxmax()]
-        st.markdown(f"""
-        <div class="strategy-box">
-            <span class="strategy-icon">INSIGHT</span>
-            <b>Nhịp độ sản xuất:</b> Đỉnh điểm sản lượng rơi vào tháng <b>{peak_month['ym'].strftime('%m/%Y')}</b> 
-            với <b>{peak_month['sl']:,.0f}</b> sản phẩm. Đây là mốc cần chuẩn bị vật tư trước 2 tháng.
-        </div>
-        """, unsafe_allow_html=True)
+        if not monthly.empty:
+            peak_month = monthly.loc[monthly['sl'].idxmax()]
+            st.markdown(f"""
+            <div class="strategy-box">
+                <span class="strategy-icon">INSIGHT</span>
+                <b>Nhịp độ sản xuất:</b> Đỉnh điểm sản lượng rơi vào tháng <b>{peak_month['ym'].strftime('%m/%Y')}</b> 
+                với <b>{peak_month['sl']:,.0f}</b> sản phẩm. Đây là mốc cần chuẩn bị vật tư trước 2 tháng.
+            </div>
+            """, unsafe_allow_html=True)
 
     with c2:
         st.subheader("Tỷ trọng theo Khu vực")
-        # Logic heuristic khu vực (giả định dựa trên tên KH)
-        fig_region = px.pie(df_filtered, values='sl', names='khu_vuc', hole=0.6, 
-                            color_discrete_sequence=[PRIMARY, ACCENT, "#9EA7AD"])
-        st.plotly_chart(fig_region, use_container_width=True)
+        # Aggregation trước khi vẽ để tránh lỗi
+        region_agg = df_filtered.groupby('khu_vuc')['sl'].sum().reset_index()
+        if not region_agg.empty:
+            fig_region = px.pie(region_agg, values='sl', names='khu_vuc', hole=0.6, 
+                                color_discrete_sequence=[PRIMARY, ACCENT, "#9EA7AD"])
+            st.plotly_chart(fig_region, use_container_width=True)
+        else:
+            st.info("Chưa có dữ liệu khu vực.")
 
 # --- TAB 2: SKU MATRIX (Advanced) ---
 with tab2:
@@ -334,12 +343,12 @@ with tab3:
         st.subheader("Top Khách Hàng")
         top_cust = df_filtered.groupby('khach_hang')['sl'].sum().sort_values(ascending=False).reset_index()
         
-        # Tương tác: Chọn khách hàng từ bảng để lọc biểu đồ bên cạnh
+        # Tương tác: Chọn khách hàng
         selection = st.dataframe(
             top_cust.style.background_gradient(cmap="Greens"), 
             use_container_width=True, 
             height=400,
-            on_select="rerun", # Yêu cầu Streamlit mới nhất
+            on_select="rerun",
             selection_mode="single-row"
         )
         
@@ -353,18 +362,18 @@ with tab3:
             st.subheader(f"Chi tiết: {selected_cust}")
             cust_df = df_filtered[df_filtered['khach_hang'] == selected_cust]
             
-            # Biểu đồ con 1: Trend của KH này
-            fig_c1 = px.bar(cust_df.groupby('ym')['sl'].sum().reset_index(), x='ym', y='sl', title="Sản lượng theo tháng")
+            # Chart 1: Trend
+            cust_trend = cust_df.groupby('ym')['sl'].sum().reset_index()
+            fig_c1 = px.bar(cust_trend, x='ym', y='sl', title="Sản lượng theo tháng")
             fig_c1.update_traces(marker_color=ACCENT)
             st.plotly_chart(fig_c1, use_container_width=True)
             
-            # Biểu đồ con 2: Top SKU của KH này
+            # Chart 2: Top SKU
             top_sku_cust = cust_df.groupby('ma_hang')['sl'].sum().nlargest(5).reset_index()
             fig_c2 = px.bar(top_sku_cust, x='sl', y='ma_hang', orientation='h', title="Top 5 SKU mua nhiều nhất")
             st.plotly_chart(fig_c2, use_container_width=True)
         else:
-            st.info("👈 Chọn một khách hàng bên trái để xem chi tiết drill-down.")
-            # Hiển thị mặc định Pareto chung
+            st.info("👈 Chọn một khách hàng bên trái để xem chi tiết.")
             st.subheader("Phân bổ Pareto (80/20)")
             top_cust['cumulative'] = top_cust['sl'].cumsum() / top_cust['sl'].sum()
             fig_pareto = px.line(top_cust.reset_index(), x='index', y='cumulative', markers=True)
@@ -375,7 +384,6 @@ with tab3:
 with tab4:
     st.subheader("Xu hướng Nhóm màu (Color Trend)")
     color_trend = df_filtered.groupby(['year', 'nhom_mau'])['sl'].sum().reset_index()
-    # Tính %
     color_trend['share'] = color_trend['sl'] / color_trend.groupby('year')['sl'].transform('sum')
     
     fig_color = px.bar(color_trend, x='year', y='share', color='nhom_mau', 
@@ -390,12 +398,11 @@ with tab4:
     </div>
     """, unsafe_allow_html=True)
 
-# --- TAB 5: WHAT-IF SIMULATION (New) ---
+# --- TAB 5: WHAT-IF SIMULATION ---
 with tab5:
     st.markdown("### 🧪 Mô phỏng Kế hoạch 2026")
     st.caption("Công cụ tính toán nhu cầu nguồn lực dựa trên giả định tăng trưởng.")
     
-    # Lấy dữ liệu năm gần nhất làm base
     base_year = df['year'].max()
     base_data = df[df['year'] == base_year]
     base_vol = base_data['sl'].sum()
