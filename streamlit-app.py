@@ -9,7 +9,7 @@ from datetime import datetime
 from st_aggrid import AgGrid, GridOptionsBuilder
 
 # ==========================================
-# 1. CẤU HÌNH GIAO DIỆN (SUPER NEON GLOW EDITION)
+# 1. CẤU HÌNH GIAO DIỆN (NEON CENTERED EDITION)
 # ==========================================
 st.set_page_config(page_title="Mộc Phát Analytics Pro", layout="wide", page_icon="🌲")
 
@@ -17,130 +17,124 @@ st.set_page_config(page_title="Mộc Phát Analytics Pro", layout="wide", page_i
 PRIMARY = "#00C853"    
 NEON_GREEN = "#00E676" 
 BG_DARK = "#050505"    
-TEXT_MAIN = "#FFFFFF"
-TEXT_SUB = "#B0BEC5"
-GRID_COLOR = "rgba(255, 255, 255, 0.05)"
+TEXT_MAIN = "#FFFFFF"  # Đổi sang trắng tinh cho nổi
+TEXT_SUB = "#E0E0E0"   # Xám sáng hơn chút
+GRID_COLOR = "rgba(255, 255, 255, 0.08)"
 
-# --- CSS VISUAL EFFECTS (FLOATING BAR & SUPER GLOW) ---
+# --- CSS VISUAL EFFECTS (CLEAN & POP) ---
 css_style = """
 <style>
     /* 1. NỀN DEEP NEBULA */
     .stApp {{
         background-color: {bg_dark};
         background-image: 
-            radial-gradient(at 50% 0%, rgba(0, 200, 83, 0.15) 0px, transparent 60%),
-            radial-gradient(at 90% 90%, rgba(0, 230, 118, 0.08) 0px, transparent 50%);
+            radial-gradient(at 50% 0%, rgba(0, 200, 83, 0.1) 0px, transparent 50%),
+            radial-gradient(at 50% 100%, rgba(0, 230, 118, 0.05) 0px, transparent 50%);
         background-attachment: fixed;
     }}
 
-    /* 2. HEADER: FLOATING GLASS BAR (BO TRÒN MỀM MẠI) */
+    /* 2. HEADER CĂN GIỮA & LOGO NEON */
     .header-sticky {{
-        position: sticky; top: 20px; z-index: 999; /* Cách top 20px để lơ lửng */
-        background: rgba(15, 15, 15, 0.85);
-        backdrop-filter: blur(25px);
-        border: 1px solid rgba(0, 230, 118, 0.3);
-        padding: 15px 30px; 
-        margin-bottom: 40px;
-        margin-left: 10px; margin-right: 10px; /* Cách lề 2 bên */
-        border-radius: 50px; /* Bo tròn cực mạnh (Pill Shape) */
+        position: sticky; top: 0; z-index: 999;
+        background: rgba(10, 10, 10, 0.85);
+        backdrop-filter: blur(20px);
+        border-bottom: 1px solid rgba(0, 230, 118, 0.3); /* Viền sáng hơn chút */
+        padding: 15px 0; 
+        margin-bottom: 30px;
         display: flex; 
         align-items: center; 
-        justify-content: center;
-        box-shadow: 0 10px 40px rgba(0, 230, 118, 0.15); /* Bóng xanh tỏa rộng */
+        justify-content: center; /* CĂN GIỮA */
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        position: relative;
     }}
     
-    /* 3. LOGO & TEXT SUPER GLOW */
+    /* Hiệu ứng Logo Neon */
     .glow-logo {{
-        filter: drop-shadow(0 0 15px {neon}); /* Logo tỏa sáng rộng hơn */
+        filter: drop-shadow(0 0 8px {neon}); /* Phát sáng */
         transition: transform 0.3s;
     }}
     .glow-logo:hover {{
-        transform: scale(1.1) rotate(5deg);
-        filter: drop-shadow(0 0 25px {neon});
-    }}
-    
-    .neon-title {{
-        font-family: 'Segoe UI', sans-serif;
-        font-weight: 900;
-        font-size: 32px; /* Chữ to hơn */
-        color: #fff;     /* Lõi chữ màu trắng để dễ đọc */
-        text-shadow: 
-            0 0 10px {neon},
-            0 0 20px {neon},
-            0 0 40px {primary}; /* 3 lớp bóng neon cực mạnh */
-        letter-spacing: 1px;
-        margin-top: 5px;
-        text-transform: uppercase;
+        transform: scale(1.1);
+        filter: drop-shadow(0 0 15px {neon});
     }}
 
-    /* Badge bên phải */
+    /* Badge nằm tuyệt đối bên phải */
     .header-badge {{
         position: absolute;
-        right: 30px;
+        right: 25px;
         top: 50%;
         transform: translateY(-50%);
         border: 1px solid {primary};
         color: {neon};
-        padding: 6px 18px;
-        border-radius: 30px;
-        font-size: 11px;
-        font-weight: 700;
-        background: rgba(0, 200, 83, 0.15);
-        box-shadow: 0 0 10px rgba(0, 200, 83, 0.2);
+        padding: 5px 15px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: bold;
+        background: rgba(0, 200, 83, 0.1);
     }}
 
-    /* 4. SUBHEADERS */
+    /* 3. TIÊU ĐỀ PHỤ (SUBHEADER) NỔI BẬT */
+    /* Target vào h3 của Streamlit (st.subheader) */
     h3 {{
-        color: {text_main} !important;
+        color: {neon} !important;          /* Màu xanh Neon */
         font-family: 'Segoe UI', sans-serif;
         font-weight: 700 !important;
-        border-left: 4px solid {neon};
-        padding-left: 15px;
-        margin-top: 25px !important;
-        text-shadow: 0 0 15px rgba(0, 230, 118, 0.4);
+        text-shadow: 0 0 10px rgba(0, 230, 118, 0.3); /* Bóng sáng */
+        border-left: 4px solid {primary};  /* Vạch kẻ bên trái */
+        padding-left: 12px;
+        margin-top: 20px !important;
+        margin-bottom: 10px !important;
+    }}
+    
+    /* Target vào h1, h2 */
+    h1, h2 {{
+        color: {text_main} !important;
+        text-shadow: 0 2px 4px rgba(0,0,0,0.5);
     }}
 
-    /* 5. KPI CARDS (Soft Edges) */
+    /* 4. KPI CARDS (Depth & Glow) */
     .kpi-card {{
         background: rgba(30, 30, 30, 0.6);
-        backdrop-filter: blur(12px);
-        border-radius: 20px; /* Bo góc card mềm hơn */
-        padding: 22px;
+        backdrop-filter: blur(10px);
+        border-radius: 16px;
+        padding: 20px;
         border: 1px solid rgba(255, 255, 255, 0.08);
-        border-left: 5px solid {primary};
-        box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        border-left: 4px solid {primary};
+        box-shadow: 0 4px 15px rgba(0,0,0,0.3);
         transition: all 0.3s ease;
     }}
     .kpi-card:hover {{
-        transform: translateY(-6px);
+        transform: translateY(-5px);
         border-left-color: {neon};
-        box-shadow: 0 10px 35px rgba(0, 230, 118, 0.2);
-        background: rgba(50, 50, 50, 0.8);
+        box-shadow: 0 8px 30px rgba(0, 230, 118, 0.15);
+        background: rgba(45, 45, 45, 0.8);
+        border-top: 1px solid rgba(0, 230, 118, 0.3);
     }}
-    .kpi-val {{ font-size: 30px; font-weight: 800; color: {text_main}; letter-spacing: -0.5px; margin: 5px 0; }}
+    .kpi-lbl {{ font-size: 13px; color: {text_sub}; text-transform: uppercase; letter-spacing: 1px; font-weight: 600; }}
+    .kpi-val {{ font-size: 32px; font-weight: 800; color: {text_main}; letter-spacing: -1px; margin: 5px 0; }}
 
-    /* 6. TABS */
-    .stTabs [data-baseweb="tab-list"] {{ gap: 12px; background: transparent; }}
+    /* 5. TABS & AGGRID */
+    .stTabs [data-baseweb="tab-list"] {{ gap: 10px; background: transparent; }}
     .stTabs [data-baseweb="tab"] {{ 
         background-color: rgba(255,255,255,0.05); 
         color: {text_sub}; 
-        border-radius: 12px; /* Tab bo tròn hơn */
-        padding: 10px 24px;
+        border-radius: 8px; 
         border: 1px solid transparent;
+        padding: 8px 20px;
     }}
     .stTabs [aria-selected="true"] {{ 
         border: 1px solid {neon};
         color: {neon};
-        background: rgba(0, 230, 118, 0.1);
+        background: rgba(0, 230, 118, 0.08);
         font-weight: bold;
-        box-shadow: 0 0 15px rgba(0, 230, 118, 0.15);
+        box-shadow: 0 0 15px rgba(0, 230, 118, 0.1);
     }}
     
-    /* AgGrid Fix */
+    /* AgGrid Dark Theme Clean */
     .ag-theme-alpine-dark {{
-        --ag-background-color: #101010 !important;
+        --ag-background-color: #0F0F0F !important;
         --ag-header-background-color: #181818 !important;
-        --ag-odd-row-background-color: #101010 !important;
+        --ag-odd-row-background-color: #0F0F0F !important;
         --ag-foreground-color: {text_sub} !important;
         --ag-border-color: #333 !important;
         font-family: 'Segoe UI', sans-serif !important;
@@ -162,6 +156,7 @@ def polish_chart(fig):
         margin=dict(t=40, b=20, l=10, r=10),
         hovermode="x unified",
     )
+    # Lưới sáng hơn chút để dễ nhìn trên nền đen
     fig.update_xaxes(showgrid=False, linecolor=GRID_COLOR)
     fig.update_yaxes(showgrid=True, gridcolor=GRID_COLOR, zerolinecolor=GRID_COLOR)
     return fig
@@ -216,7 +211,7 @@ df_raw, error = load_data()
 if error: st.error(error); st.stop()
 
 # ==========================================
-# 3. HEADER (FLOATING & SUPER NEON)
+# 3. HEADER (CENTERED & NEON LOGO)
 # ==========================================
 def get_base64_logo(path):
     if os.path.exists(path):
@@ -225,22 +220,22 @@ def get_base64_logo(path):
     return None
 
 logo_b64 = get_base64_logo("mocphat_logo.png")
-# Logo to hơn chút (height=70)
-logo_img = f'<img src="data:image/png;base64,{logo_b64}" height="70" class="glow-logo">' if logo_b64 else '<span style="font-size:60px">🌲</span>'
+# Thêm class glow-logo cho ảnh
+logo_img = f'<img src="data:image/png;base64,{logo_b64}" height="60" class="glow-logo">' if logo_b64 else '<span style="font-size:50px">🌲</span>'
 
 st.markdown(f"""
 <div class="header-sticky">
     <div style="text-align:center;">
         {logo_img}
-        <div class="neon-title">
+        <div style="font-size:28px; font-weight:900; color:{NEON_GREEN}; letter-spacing:1px; margin-top:5px; text-shadow:0 0 10px rgba(0,230,118,0.5);">
             MỘC PHÁT INTELLIGENCE
         </div>
-        <div style="font-size:13px; color:{TEXT_SUB}; letter-spacing:3px; margin-top:5px; font-weight:300;">
+        <div style="font-size:14px; color:{TEXT_SUB}; letter-spacing:2px; font-weight:300;">
             EXECUTIVE DASHBOARD
         </div>
     </div>
     <div class="header-badge">
-        PRO VERSION
+        MASTER 2023-2025
     </div>
 </div>
 """, unsafe_allow_html=True)
@@ -458,4 +453,4 @@ with tab6:
     render_dark_aggrid(grid_df, height=600)
 
 st.markdown("---")
-st.caption(f"© 2026 Mộc Phát Furniture | Super Neon Edition | Updated: {datetime.now().strftime('%d/%m/%Y')}")
+st.caption(f"© 2026 Mộc Phát Furniture | Cyber Glass Edition | Updated: {datetime.now().strftime('%d/%m/%Y')}")
