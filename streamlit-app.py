@@ -80,6 +80,15 @@ st.markdown(f"""
         padding: 15px;
         height: 100%;
     }}
+
+    /* AGGRID THEME OVERRIDE */
+    .ag-theme-alpine-dark {
+        --ag-background-color: transparent !important;
+        --ag-header-background-color: rgba(255,255,255,0.05) !important;
+        --ag-odd-row-background-color: rgba(255,255,255,0.02) !important;
+        --ag-foreground-color: #E0E0E0 !important;
+        --ag-border-color: rgba(255,255,255,0.1) !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -95,6 +104,23 @@ def polish_chart(fig):
     fig.update_xaxes(showgrid=False, linecolor=GRID_COLOR)
     fig.update_yaxes(showgrid=True, gridcolor=GRID_COLOR, zerolinecolor=GRID_COLOR)
     return fig
+
+# --- HÀM RENDER AGGRID (ĐÃ BỔ SUNG LẠI) ---
+def render_glass_aggrid(dataframe, height=400):
+    gb = GridOptionsBuilder.from_dataframe(dataframe)
+    gb.configure_pagination(paginationAutoPageSize=True)
+    gb.configure_selection('multiple', use_checkbox=True)
+    gb.configure_default_column(resizable=True, filterable=True, sortable=True)
+    
+    # Định dạng số
+    for col in dataframe.select_dtypes(include=['number']).columns:
+        gb.configure_column(col, type=["numericColumn", "numberColumnFilter"], precision=0)
+        
+    gridOptions = gb.build()
+    
+    st.markdown('<div class="chart-box">', unsafe_allow_html=True)
+    AgGrid(dataframe, gridOptions=gridOptions, height=height, theme='alpine-dark', enable_enterprise_modules=False)
+    st.markdown('</div>', unsafe_allow_html=True)
 
 # ==========================================
 # 2. XỬ LÝ DỮ LIỆU (LOGIC THỰC TẾ 100%)
@@ -119,12 +145,10 @@ def load_data():
         season_map = {12:'Đông', 1:'Đông', 2:'Đông', 3:'Xuân', 4:'Xuân', 5:'Xuân', 6:'Hè', 7:'Hè', 8:'Hè', 9:'Thu', 10:'Thu', 11:'Thu'}
         df['mua'] = df['month'].map(season_map)
         
-        # --- LOGIC MẪU MỚI / CŨ (Quan trọng cho chiến lược 70/30) ---
-        # Tìm năm xuất hiện đầu tiên của mã hàng
+        # --- LOGIC MẪU MỚI / CŨ ---
         first_seen = df.groupby('ma_hang')['year'].min().reset_index()
         first_seen.rename(columns={'year': 'first_year'}, inplace=True)
         df = df.merge(first_seen, on='ma_hang', how='left')
-        # Nếu năm sx == năm đầu tiên -> New, ngược lại -> Repeat
         df['loai_mau'] = np.where(df['year'] == df['first_year'], 'Mẫu Mới (New)', 'Mẫu Cũ (Repeat)')
 
         # Xử lý nhóm màu
@@ -163,7 +187,7 @@ st.markdown(f"""
 
 st.sidebar.markdown("### 🎯 BỘ LỌC")
 years = sorted(df_raw['year'].unique(), reverse=True)
-sel_years = st.sidebar.multiselect("Năm Phân Tích", years, default=years[:1]) # Mặc định chọn năm mới nhất
+sel_years = st.sidebar.multiselect("Năm Phân Tích", years, default=years[:1]) 
 df = df_raw[df_raw['year'].isin(sel_years)] if sel_years else df_raw
 if df.empty: st.warning("Không có dữ liệu!"); st.stop()
 
@@ -174,13 +198,11 @@ st.subheader("🚀 Chỉ Số Sức Khỏe Doanh Nghiệp")
 
 curr_year = df['year'].max()
 vol_curr = df['sl'].sum()
-# Tính tăng trưởng so với năm trước (nếu có dữ liệu gốc)
 try:
     vol_prev = df_raw[df_raw['year'] == curr_year - 1]['sl'].sum()
     growth = ((vol_curr - vol_prev) / vol_prev * 100) if vol_prev > 0 else 0
 except: growth = 0
 
-# Tính tỷ lệ mẫu mới thực tế
 mix_stats = df.groupby('loai_mau')['sl'].sum()
 total_mix = mix_stats.sum()
 new_ratio = (mix_stats.get('Mẫu Mới (New)', 0) / total_mix * 100) if total_mix > 0 else 0
@@ -202,8 +224,7 @@ def kpi_card(col, lbl, val, sub_val, sub_lbl, type="neutral"):
 
 kpi_card(c1, f"TỔNG SẢN LƯỢNG {curr_year}", f"{vol_curr:,.0f}", growth, "vs Năm trước", "good" if growth > 0 else "bad")
 kpi_card(c2, "SỐ LƯỢNG MÃ HÀNG (SKU)", f"{df['ma_hang'].nunique():,.0f}", 0, "Đang hoạt động", "neutral")
-# Card Chiến lược 70/30
-status_mix = "good" if new_ratio <= 35 else "bad" # Ngưỡng an toàn 35%
+status_mix = "good" if new_ratio <= 35 else "bad" 
 kpi_card(c3, "TỶ LỆ MẪU MỚI (R&D)", f"{new_ratio:.1f}%", new_ratio - 30, "Mục tiêu < 30%", status_mix)
 kpi_card(c4, "SỐ LƯỢNG KHÁCH HÀNG", f"{df['khach_hang'].nunique()}", 0, "Đối tác", "neutral")
 
@@ -220,7 +241,7 @@ tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "📋 5. DỮ LIỆU CHI TIẾT"
 ])
 
-# --- TAB 1: CHIẾN LƯỢC 70/30 (Strategy Compass) ---
+# --- TAB 1: CHIẾN LƯỢC 70/30 ---
 with tab1:
     st.markdown(f"""
     <div class="story-box">
@@ -233,7 +254,6 @@ with tab1:
     c1_1, c1_2 = st.columns([2, 1])
     
     with c1_1:
-        # Biểu đồ diễn biến Mẫu mới theo tháng
         mix_trend = df.groupby(['month', 'loai_mau'])['sl'].sum().reset_index()
         fig_mix = px.bar(mix_trend, x='month', y='sl', color='loai_mau', 
                          title="Cơ cấu Sản xuất: Mẫu Mới vs Mẫu Cũ theo Tháng",
@@ -244,7 +264,6 @@ with tab1:
         st.markdown('</div>', unsafe_allow_html=True)
         
     with c1_2:
-        # Donut Chart tổng thể
         grp_mix = df.groupby('loai_mau')['sl'].sum().reset_index()
         fig_donut = px.pie(grp_mix, values='sl', names='loai_mau', hole=0.6, 
                            title=f"Tỷ trọng Năm {curr_year}",
@@ -254,7 +273,7 @@ with tab1:
         st.plotly_chart(polish_chart(fig_donut), use_container_width=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
-# --- TAB 2: SỨC KHỎE SẢN XUẤT (Efficiency) ---
+# --- TAB 2: SỨC KHỎE SẢN XUẤT ---
 with tab2:
     st.markdown(f"""
     <div class="story-box">
@@ -263,7 +282,6 @@ with tab2:
     </div>
     """, unsafe_allow_html=True)
     
-    # Tính toán chỉ số Fragmentation
     frag_data = df.groupby('month').agg(
         Total_Vol=('sl', 'sum'),
         SKU_Count=('ma_hang', 'nunique')
@@ -290,7 +308,6 @@ with tab2:
         st.markdown('</div>', unsafe_allow_html=True)
         
     with c2_2:
-        # Top SKU hiệu quả thấp (Đuôi dài)
         sku_stats = df.groupby('ma_hang')['sl'].sum().reset_index()
         low_limit = sku_stats['sl'].quantile(0.2)
         long_tail = sku_stats[sku_stats['sl'] <= low_limit]
@@ -361,6 +378,7 @@ with tab4:
         growth_cust = ((v_c - v_p)/v_p*100).fillna(0).sort_values(ascending=False).reset_index()
         growth_cust.columns = ['Khách Hàng', '% Tăng']
         
+        # SỬA LỖI: Gọi hàm render_glass_aggrid đã được định nghĩa
         render_glass_aggrid(growth_cust.head(10), height=400)
 
 # --- TAB 5: DỮ LIỆU ---
