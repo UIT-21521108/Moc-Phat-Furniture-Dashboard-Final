@@ -14,7 +14,7 @@ from st_aggrid import AgGrid, GridOptionsBuilder
 st.set_page_config(page_title="Mộc Phát Analytics Pro", layout="wide", page_icon="🌲")
 
 # Bảng màu Neon Dark
-PRIMARY = "#066839"    # Xanh Mộc Phát gốc
+PRIMARY = "#066839"     # Xanh Mộc Phát gốc
 NEON_GREEN = "#00E676" # Xanh Neon phát sáng
 ACCENT  = "#66BB6A"    # Xanh lá sáng
 BG_COLOR = "#050505"   # Đen sâu thẳm
@@ -41,14 +41,12 @@ def polish_chart(fig):
         font=dict(color=TEXT_SUB, family="Segoe UI"),
         margin=dict(t=40, b=20, l=10, r=10),
         hovermode="x unified",
-        # barcornerradius=4 # Tạm tắt để tương thích mọi version
     )
     fig.update_xaxes(showgrid=False, linecolor=GRID_COLOR)
     fig.update_yaxes(showgrid=True, gridcolor=GRID_COLOR, zerolinecolor=GRID_COLOR)
     return fig
 
 # --- CSS HIỆU ỨNG ĐẶC BIỆT (HOVER GLOW) ---
-# Sử dụng {{ và }} để tránh lỗi f-string trong Python
 st.markdown(f"""
 <style>
     /* 1. Nền & Chữ */
@@ -171,7 +169,7 @@ st.markdown(f"""
     <div style="display:flex; gap:15px; align-items:center;">
         {logo_img}
         <div>
-            <div class="app-title">MỘC PHÁT INTELLIGENCE</div>
+            <div class="app-title">MỘC PHÁT FURNITURE</div>
             <div style="font-size:13px; color:{TEXT_SUB};">Premium Dark Edition</div>
         </div>
     </div>
