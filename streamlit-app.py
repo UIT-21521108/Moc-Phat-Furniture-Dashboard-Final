@@ -8,13 +8,13 @@ import os
 from datetime import datetime
 
 # ==========================================
-# 1. CẤU HÌNH GIAO DIỆN (FINAL FIX - CENTERED HEADER)
+# 1. CẤU HÌNH GIAO DIỆN (FINAL - GLOW EFFECT)
 # ==========================================
 st.set_page_config(page_title="Mộc Phát Analytics", layout="wide", page_icon="🌲")
 
 # Bảng màu Mộc Phát Premium
 PRIMARY = "#066839"     # Xanh Mộc Phát gốc
-NEON_GREEN = "#00E676"  # Xanh Neon (Tăng trưởng)
+NEON_GREEN = "#00E676"  # Xanh Neon (Tăng trưởng/Glow)
 NEON_RED = "#FF5252"    # Đỏ Neon (Sụt giảm)
 ACCENT  = "#66BB6A"     # Xanh lá sáng
 BG_COLOR = "#050505"    # Đen sâu
@@ -46,7 +46,7 @@ def polish_chart(fig):
     fig.update_yaxes(showgrid=True, gridcolor=GRID_COLOR, zerolinecolor=GRID_COLOR)
     return fig
 
-# --- CSS FIX LỖI TABS & GIAO DIỆN ---
+# --- CSS CAO CẤP (GIAO DIỆN + HIỆU ỨNG GLOW) ---
 st.markdown(f"""
 <style>
     /* 1. Nền & Chữ */
@@ -65,12 +65,12 @@ st.markdown(f"""
         border-radius: 16px;
         display: flex;
         align-items: center;
-        justify-content: center; /* Căn giữa nội dung */
+        justify-content: center;
         box-shadow: 0 4px 20px rgba(0,0,0,0.5);
     }}
     .app-title {{ font-size: 28px; font-weight: 800; color: {ACCENT}; margin: 5px 0 0 0; text-transform: uppercase; letter-spacing: 1.5px; }}
 
-    /* 3. KPI Cards Fixed */
+    /* 3. KPI Cards */
     .kpi-card {{
         background: {CARD_BG}; 
         border-radius: 12px;
@@ -84,32 +84,43 @@ st.markdown(f"""
     .kpi-lbl {{ font-size: 13px; color: {TEXT_SUB}; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; margin-bottom: 5px; }}
     .kpi-val {{ font-size: 28px; font-weight: 800; color: {TEXT_MAIN}; }}
     
-    /* 4. TABS STYLE FIX */
+    /* 4. CUSTOM TABS STYLE (CÓ HIỆU ỨNG GLOW) */
     .stTabs [data-baseweb="tab-list"] {{
-        gap: 5px;
+        gap: 8px;
         background-color: transparent;
-        padding-bottom: 5px;
+        padding: 10px 0;
+        border-bottom: 1px solid rgba(255,255,255,0.1);
     }}
+    
+    /* Trạng thái thường */
     .stTabs [data-baseweb="tab"] {{
-        height: 45px;
-        white-space: pre-wrap;
+        height: 40px;
         background-color: {CARD_BG};
-        border-radius: 8px;
-        color: {TEXT_SUB};
         border: 1px solid rgba(255,255,255,0.1);
+        border-radius: 6px;
+        color: {TEXT_SUB};
         padding: 0 20px;
         font-weight: 600;
-        transition: all 0.2s;
+        font-size: 14px;
+        transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
     }}
+    
+    /* HIỆU ỨNG GLOW KHI DI CHUỘT (HOVER) */
     .stTabs [data-baseweb="tab"]:hover {{
-        border-color: {ACCENT};
-        color: {ACCENT};
-        background-color: rgba(255,255,255,0.05);
+        border-color: {NEON_GREEN} !important;
+        color: {NEON_GREEN} !important;
+        background-color: rgba(0, 230, 118, 0.1) !important;
+        box-shadow: 0 0 15px rgba(0, 230, 118, 0.6); /* Ánh xanh phát sáng */
+        transform: translateY(-2px); /* Nhấc nhẹ lên */
+        z-index: 10;
     }}
+    
+    /* Trạng thái đang chọn (Active) */
     .stTabs [aria-selected="true"] {{
         background-color: {PRIMARY} !important;
-        color: white !important;
-        border: 1px solid {PRIMARY} !important;
+        color: #FFFFFF !important;
+        border: 1px solid {NEON_GREEN} !important;
+        box-shadow: 0 0 10px rgba(0, 230, 118, 0.3);
     }}
 
     /* 5. Insight & Forecast Box */
@@ -133,7 +144,7 @@ st.markdown(f"""
 </style>
 """, unsafe_allow_html=True)
 
-# Header - CẬP NHẬT: CĂN GIỮA & BỎ TEXT PHỤ
+# Header - CĂN GIỮA
 logo_b64 = get_base64_logo("mocphat_logo.png")
 logo_img = f'<img src="data:image/png;base64,{logo_b64}" height="65">' if logo_b64 else "🌲"
 st.markdown(f"""
