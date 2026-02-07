@@ -7,8 +7,6 @@ import base64
 import os
 from datetime import datetime
 from st_aggrid import AgGrid, GridOptionsBuilder
-# --- THÊM THƯ VIỆN MACHINE LEARNING ---
-from sklearn.linear_model import LinearRegression
 
 # ==========================================
 # 1. CẤU HÌNH GIAO DIỆN (PREMIUM NEON DARK - STABLE)
@@ -330,100 +328,104 @@ with tab1:
         </div>
         """, unsafe_allow_html=True)
 
-# --- TAB 2: DỰ BÁO AI 2026 (MACHINE LEARNING) ---
+# --- TAB 2: DỰ BÁO AI 2026 (NUMPY POLYFIT) ---
 with tab2:
-    st.subheader("🤖 Dự báo Thông minh (Machine Learning)")
-    st.caption("Mô hình hồi quy tuyến tính (Linear Regression) học từ xu hướng quá khứ và tính chất mùa vụ.")
+    st.subheader("🤖 Dự báo Thông minh (Numpy Polyfit)")
+    st.caption("Sử dụng thuật toán hồi quy đa thức và chỉ số mùa vụ để dự báo xu hướng 2026.")
     
-    # 1. Prepare Data for ML
+    # 1. Prepare Data
     hist_data = df_raw.groupby('ym')['sl'].sum().reset_index().sort_values('ym')
-    hist_data['trend_index'] = np.arange(len(hist_data))
-    hist_data['month_num'] = hist_data['ym'].dt.month
     
-    # One-Hot Encoding for Month (Seasonality)
-    X = pd.get_dummies(hist_data['month_num'], prefix='month')
-    # Ensure all 12 months columns exist
-    for i in range(1, 13):
-        col = f'month_{i}'
-        if col not in X.columns: X[col] = 0
-    X = X[sorted(X.columns)] # Sort columns to match later
+    # Tạo biến X (số tháng tính từ mốc ban đầu)
+    hist_data['idx'] = np.arange(len(hist_data))
+    hist_data['month'] = hist_data['ym'].dt.month
     
-    X['trend_index'] = hist_data['trend_index'] # Add trend
-    y = hist_data['sl']
+    x_hist = hist_data['idx'].values
+    y_hist = hist_data['sl'].values
     
-    # 2. Train Model
-    model = LinearRegression()
-    model.fit(X, y)
-    r2_score = model.score(X, y)
-    
-    # 3. Create Future Data (2026)
-    future_dates = pd.date_range(start='2026-01-01', periods=12, freq='MS')
-    future_df = pd.DataFrame({'ym': future_dates})
-    future_df['trend_index'] = np.arange(len(hist_data), len(hist_data) + 12)
-    future_df['month_num'] = future_df['ym'].dt.month
-    
-    X_future = pd.get_dummies(future_df['month_num'], prefix='month')
-    for i in range(1, 13):
-        col = f'month_{i}'
-        if col not in X_future.columns: X_future[col] = 0
-    X_future = X_future[sorted(X_future.columns)]
-    X_future['trend_index'] = future_df['trend_index']
-    
-    # 4. Predict
-    y_pred = model.predict(X_future)
-    future_df['sl_pred'] = y_pred
-    ai_total_2026 = future_df['sl_pred'].sum()
+    # 2. Tính toán Trend (Xu hướng) dùng Numpy Polyfit (Bậc 1 = Tuyến tính)
+    if len(x_hist) > 1:
+        z = np.polyfit(x_hist, y_hist, 1) # Hệ số hồi quy
+        p = np.poly1d(z) # Hàm xu hướng
+        
+        # 3. Tính toán Chỉ số Mùa vụ (Seasonality Index)
+        # Lấy giá trị thực tế / giá trị xu hướng
+        hist_data['trend_val'] = p(x_hist)
+        hist_data['seasonality'] = hist_data['sl'] / hist_data['trend_val']
+        
+        # Trung bình chỉ số mùa vụ cho từng tháng (1-12)
+        season_indices = hist_data.groupby('month')['seasonality'].mean().to_dict()
+        
+        # 4. Dự báo 2026
+        future_dates = pd.date_range(start='2026-01-01', periods=12, freq='MS')
+        future_idx = np.arange(len(hist_data), len(hist_data) + 12)
+        future_months = future_dates.month
+        
+        # Giá trị Trend 2026
+        trend_2026 = p(future_idx)
+        
+        # Áp dụng mùa vụ
+        pred_2026 = []
+        for i, m in enumerate(future_months):
+            # Lấy chỉ số mùa vụ của tháng đó (nếu ko có thì lấy 1)
+            si = season_indices.get(m, 1.0)
+            pred_2026.append(trend_2026[i] * si)
+            
+        pred_2026 = np.array(pred_2026)
+        ai_total_2026 = pred_2026.sum()
 
-    # 5. UI Controls
-    col_input, col_info = st.columns([1, 2])
-    
-    with col_input:
-        st.markdown("**🛠️ Điều chỉnh Quản trị**")
-        st.info("AI đưa ra dự báo nền tảng. Bạn có thể dùng thanh trượt để áp đặt mục tiêu tăng trưởng thêm (Stretch Goal) hoặc dự phòng rủi ro.")
-        adj_percent = st.slider("Điều chỉnh (+/- %)", -20, 50, 0, 5)
-        adj_factor = 1 + (adj_percent / 100)
+        # 5. UI Controls
+        col_input, col_info = st.columns([1, 2])
         
-        final_forecast = future_df.copy()
-        final_forecast['sl_final'] = final_forecast['sl_pred'] * adj_factor
-        final_total = final_forecast['sl_final'].sum()
-        
-    with col_info:
-        # Display Forecast Cards
-        sl_2025_total = df_raw[df_raw['year']==2025]['sl'].sum()
-        growth_vs_2025 = ((final_total - sl_2025_total) / sl_2025_total) * 100
-        
-        st.markdown(f"""
-        <div class="forecast-box">
-            <h4 style="margin:0; color:{NEON_GREEN}">KỊCH BẢN 2026 (AI + {adj_percent}%)</h4>
-            <div style="display:flex; justify-content:space-between; margin-top:15px; text-align:center;">
-                <div><div style="font-size:12px; color:{TEXT_SUB}">Thực tế 2025</div><div style="font-size:22px; font-weight:bold">{fmt_num(sl_2025_total)}</div></div>
-                <div><div style="font-size:12px; color:{TEXT_SUB}">AI Dự báo Gốc</div><div style="font-size:22px; font-weight:bold; color:{ACCENT}">{fmt_num(ai_total_2026)}</div></div>
-                <div style="border-left:1px solid #444; padding-left:20px;">
-                    <div style="font-size:12px; color:{TEXT_SUB}">Mục tiêu Cuối</div>
-                    <div style="font-size:26px; font-weight:800; color:{NEON_GREEN}">{fmt_num(final_total)}</div>
-                    <div style="font-size:12px; color:{NEON_GREEN}">+{growth_vs_2025:.1f}% vs 2025</div>
+        with col_input:
+            st.markdown("**🛠️ Điều chỉnh Quản trị**")
+            st.info("AI tính toán dựa trên lịch sử. Bạn có thể điều chỉnh mức độ tăng trưởng mong muốn.")
+            adj_percent = st.slider("Điều chỉnh (+/- %)", -20, 50, 0, 5)
+            adj_factor = 1 + (adj_percent / 100)
+            
+            final_pred_2026 = pred_2026 * adj_factor
+            final_total = final_pred_2026.sum()
+            
+        with col_info:
+            sl_2025_total = df_raw[df_raw['year']==2025]['sl'].sum()
+            growth_vs_2025 = ((final_total - sl_2025_total) / sl_2025_total) * 100
+            
+            st.markdown(f"""
+            <div class="forecast-box">
+                <h4 style="margin:0; color:{NEON_GREEN}">KỊCH BẢN 2026 (AI + {adj_percent}%)</h4>
+                <div style="display:flex; justify-content:space-between; margin-top:15px; text-align:center;">
+                    <div><div style="font-size:12px; color:{TEXT_SUB}">Thực tế 2025</div><div style="font-size:22px; font-weight:bold">{fmt_num(sl_2025_total)}</div></div>
+                    <div><div style="font-size:12px; color:{TEXT_SUB}">AI Dự báo Gốc</div><div style="font-size:22px; font-weight:bold; color:{ACCENT}">{fmt_num(ai_total_2026)}</div></div>
+                    <div style="border-left:1px solid #444; padding-left:20px;">
+                        <div style="font-size:12px; color:{TEXT_SUB}">Mục tiêu Cuối</div>
+                        <div style="font-size:26px; font-weight:800; color:{NEON_GREEN}">{fmt_num(final_total)}</div>
+                        <div style="font-size:12px; color:{NEON_GREEN}">+{growth_vs_2025:.1f}% vs 2025</div>
+                    </div>
                 </div>
             </div>
-            <div style="margin-top:10px; font-size:11px; color:#666; text-align:right">Độ tin cậy mô hình (R²): {r2_score:.2f}</div>
-        </div>
-        """, unsafe_allow_html=True)
+            """, unsafe_allow_html=True)
 
-    # 6. Plotting
-    # Combine History (2025) and Forecast (2026) for visualization
-    hist_2025 = hist_data[hist_data['ym'].dt.year == 2025][['ym', 'sl']].copy()
-    hist_2025['Type'] = 'Thực tế 2025'
-    
-    pred_2026 = final_forecast[['ym', 'sl_final']].rename(columns={'sl_final': 'sl'})
-    pred_2026['Type'] = f'Dự báo 2026'
-    
-    combined_viz = pd.concat([hist_2025, pred_2026])
-    
-    fig_ai = px.line(combined_viz, x='ym', y='sl', color='Type', markers=True, 
-                     color_discrete_map={'Thực tế 2025': '#757575', f'Dự báo 2026': NEON_GREEN})
-    fig_ai.update_traces(line=dict(width=3))
-    fig_ai.add_vline(x=datetime(2025, 12, 1).timestamp() * 1000, line_dash="dash", line_color="#444")
-    
-    st.plotly_chart(polish_chart(fig_ai), use_container_width=True)
+        # 6. Plotting
+        hist_view = hist_data[['ym', 'sl']].copy()
+        hist_view['Type'] = 'Lịch sử'
+        
+        future_view = pd.DataFrame({'ym': future_dates, 'sl': final_pred_2026})
+        future_view['Type'] = 'Dự báo 2026'
+        
+        # Chỉ lấy 2025 để so sánh cho gọn
+        hist_view_2025 = hist_view[hist_view['ym'].dt.year == 2025].copy()
+        hist_view_2025['Type'] = 'Thực tế 2025'
+        
+        combined_viz = pd.concat([hist_view_2025, future_view])
+        
+        fig_ai = px.line(combined_viz, x='ym', y='sl', color='Type', markers=True, 
+                         color_discrete_map={'Thực tế 2025': '#757575', 'Dự báo 2026': NEON_GREEN})
+        fig_ai.update_traces(line=dict(width=3))
+        fig_ai.add_vline(x=datetime(2025, 12, 1).timestamp() * 1000, line_dash="dash", line_color="#444")
+        
+        st.plotly_chart(polish_chart(fig_ai), use_container_width=True)
+    else:
+        st.warning("Chưa đủ dữ liệu lịch sử để dự báo.")
 
 # --- TAB 3: SỨC KHỎE SP ---
 with tab3:
