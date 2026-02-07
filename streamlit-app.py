@@ -8,7 +8,7 @@ import os
 from datetime import datetime
 
 # ==========================================
-# 1. CẤU HÌNH GIAO DIỆN (FULL GLOW EDITION)
+# 1. CẤU HÌNH GIAO DIỆN (FULL DARK THEME)
 # ==========================================
 st.set_page_config(page_title="Mộc Phát Analytics", layout="wide", page_icon="🌲")
 
@@ -46,15 +46,58 @@ def polish_chart(fig):
     fig.update_yaxes(showgrid=True, gridcolor=GRID_COLOR, zerolinecolor=GRID_COLOR)
     return fig
 
-# --- CSS CAO CẤP (FULL GLOW EFFECT) ---
+# --- CSS CAO CẤP (FULL GLOW + SYSTEM UI OVERRIDE) ---
 st.markdown(f"""
 <style>
-    /* 1. Nền & Chữ */
+    /* =============================================
+       1. SYSTEM UI OVERRIDE (FIX THANH CÔNG CỤ & SIDEBAR)
+       ============================================= */
+    
+    /* Ép Sidebar thành màu tối */
+    [data-testid="stSidebar"] {{
+        background-color: {BG_COLOR} !important;
+        border-right: 1px solid rgba(255,255,255,0.1) !important;
+    }}
+    
+    /* Ẩn/Đổi màu Header mặc định (thanh trên cùng) */
+    [data-testid="stHeader"] {{
+        background-color: rgba(0,0,0,0) !important; /* Trong suốt */
+        color: {TEXT_MAIN} !important;
+    }}
+    
+    /* Chỉnh màu chữ trong Sidebar */
+    [data-testid="stSidebar"] h1, [data-testid="stSidebar"] h2, [data-testid="stSidebar"] h3, [data-testid="stSidebar"] label, [data-testid="stSidebar"] .stMarkdown {{
+        color: {TEXT_MAIN} !important;
+    }}
+    
+    /* Style cho các ô nhập liệu (Selectbox, Multiselect) */
+    .stMultiSelect div[data-baseweb="select"] > div, .stSelectbox div[data-baseweb="select"] > div {{
+        background-color: {CARD_BG} !important;
+        border-color: rgba(255,255,255,0.2) !important;
+        color: {TEXT_MAIN} !important;
+    }}
+    
+    /* Màu của các Tag đã chọn (Chips) */
+    [data-baseweb="tag"] {{
+        background-color: {PRIMARY} !important;
+        color: white !important;
+        border: 1px solid {ACCENT} !important;
+    }}
+    
+    /* Màu icon mũi tên trong dropdown */
+    [data-testid="stSidebar"] svg {{
+        fill: {TEXT_SUB} !important;
+    }}
+    
+    /* =============================================
+       2. GIAO DIỆN CHÍNH
+       ============================================= */
+       
     .stApp {{ background-color: {BG_COLOR}; }}
     h1, h2, h3, h4 {{ color: {TEXT_MAIN} !important; font-family: 'Segoe UI', sans-serif; }}
     .stMarkdown p, .stMarkdown li {{ color: {TEXT_SUB} !important; }}
     
-    /* 2. Header Sticky */
+    /* Header Sticky - CĂN GIỮA */
     .header-sticky {{
         position: sticky; top: 15px; z-index: 999;
         background: rgba(18, 18, 18, 0.95);
@@ -68,11 +111,7 @@ st.markdown(f"""
     }}
     .app-title {{ font-size: 28px; font-weight: 800; color: {ACCENT}; margin: 5px 0 0 0; text-transform: uppercase; letter-spacing: 1.5px; }}
 
-    /* =============================================
-       3. HIỆU ỨNG GLOW CHO TẤT CẢ CÁC THẺ (CARD)
-       ============================================= */
-    
-    /* A. KPI CARDS */
+    /* KPI Cards - GLOW EFFECT */
     .kpi-card {{
         background: {CARD_BG}; 
         border-radius: 12px;
@@ -88,76 +127,42 @@ st.markdown(f"""
         border-top: 1px solid rgba(0, 230, 118, 0.5);
         border-right: 1px solid rgba(0, 230, 118, 0.5);
         border-bottom: 1px solid rgba(0, 230, 118, 0.5);
-        box-shadow: 0 0 20px rgba(0, 230, 118, 0.4); /* Glow xanh */
+        box-shadow: 0 0 20px rgba(0, 230, 118, 0.4); 
     }}
     .kpi-lbl {{ font-size: 13px; color: {TEXT_SUB}; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; margin-bottom: 5px; }}
     .kpi-val {{ font-size: 28px; font-weight: 800; color: {TEXT_MAIN}; transition: color 0.3s; }}
     .kpi-card:hover .kpi-val {{ color: {NEON_GREEN}; }}
 
-    /* B. TABS (NAVIGATION) */
-    .stTabs [data-baseweb="tab-list"] {{
-        gap: 8px;
-        background-color: transparent;
-        padding: 10px 0;
-        border-bottom: 1px solid rgba(255,255,255,0.1);
-    }}
+    /* TABS STYLE - GLOW EFFECT */
+    .stTabs [data-baseweb="tab-list"] {{ gap: 8px; background-color: transparent; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.1); }}
     .stTabs [data-baseweb="tab"] {{
-        height: 40px;
-        background-color: {CARD_BG};
-        border: 1px solid rgba(255,255,255,0.1);
-        border-radius: 6px;
-        color: {TEXT_SUB};
-        padding: 0 20px;
-        font-weight: 600;
-        font-size: 14px;
+        height: 40px; background-color: {CARD_BG}; border: 1px solid rgba(255,255,255,0.1);
+        border-radius: 6px; color: {TEXT_SUB}; padding: 0 20px; font-weight: 600; font-size: 14px;
         transition: all 0.3s ease;
     }}
-    /* Hover Tab */
     .stTabs [data-baseweb="tab"]:hover {{
-        border-color: {NEON_GREEN} !important;
-        color: {NEON_GREEN} !important;
+        border-color: {NEON_GREEN} !important; color: {NEON_GREEN} !important;
         background-color: rgba(0, 230, 118, 0.1) !important;
-        box-shadow: 0 0 15px rgba(0, 230, 118, 0.6);
-        transform: translateY(-2px);
+        box-shadow: 0 0 15px rgba(0, 230, 118, 0.6); transform: translateY(-2px);
     }}
-    /* Active Tab */
     .stTabs [aria-selected="true"] {{
-        background-color: {PRIMARY} !important;
-        color: #FFFFFF !important;
-        border: 1px solid {NEON_GREEN} !important;
-        box-shadow: 0 0 15px rgba(0, 230, 118, 0.4);
+        background-color: {PRIMARY} !important; color: #FFFFFF !important;
+        border: 1px solid {NEON_GREEN} !important; box-shadow: 0 0 15px rgba(0, 230, 118, 0.4);
     }}
 
-    /* C. INSIGHT & FORECAST BOX */
-    .insight-box, .forecast-box {{
-        padding: 15px; border-radius: 10px; margin-bottom: 20px;
-        transition: all 0.3s ease;
-        border: 1px solid transparent;
-    }}
+    /* Insight & Forecast Box */
+    .insight-box {{ background: rgba(6, 104, 57, 0.15); border: 1px solid {PRIMARY}; padding: 15px; border-radius: 10px; margin-bottom: 20px; transition: all 0.3s; }}
+    .insight-box:hover {{ box-shadow: 0 0 20px rgba(0, 230, 118, 0.3); border-color: {NEON_GREEN}; transform: scale(1.01); }}
     
-    .insight-box {{ background: rgba(6, 104, 57, 0.15); border: 1px solid {PRIMARY}; }}
-    .insight-box:hover {{
-        box-shadow: 0 0 20px rgba(0, 230, 118, 0.3);
-        border-color: {NEON_GREEN};
-        transform: scale(1.01);
-    }}
+    .forecast-box {{ background: rgba(255, 167, 38, 0.08); border: 1px solid #FFA726; padding: 15px; border-radius: 10px; margin-bottom: 20px; transition: all 0.3s; }}
+    .forecast-box:hover {{ box-shadow: 0 0 20px rgba(255, 167, 38, 0.3); transform: scale(1.01); }}
 
-    .forecast-box {{ background: rgba(255, 167, 38, 0.08); border: 1px solid #FFA726; }}
-    .forecast-box:hover {{
-        box-shadow: 0 0 20px rgba(255, 167, 38, 0.3);
-        transform: scale(1.01);
-    }}
-
-    /* 6. DataFrame */
-    [data-testid="stDataFrame"] {{
-        background-color: {CARD_BG};
-        border-radius: 12px;
-        border: 1px solid rgba(255,255,255,0.05);
-    }}
+    /* DataFrame */
+    [data-testid="stDataFrame"] {{ background-color: {CARD_BG}; border-radius: 12px; border: 1px solid rgba(255,255,255,0.05); }}
 </style>
 """, unsafe_allow_html=True)
 
-# Header
+# Header - CĂN GIỮA
 logo_b64 = get_base64_logo("mocphat_logo.png")
 logo_img = f'<img src="data:image/png;base64,{logo_b64}" height="65">' if logo_b64 else "🌲"
 st.markdown(f"""
