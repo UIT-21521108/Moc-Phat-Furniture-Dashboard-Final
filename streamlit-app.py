@@ -8,7 +8,7 @@ import os
 from datetime import datetime
 
 # ==========================================
-# 1. CẤU HÌNH GIAO DIỆN (FINAL FIX)
+# 1. CẤU HÌNH GIAO DIỆN (FINAL FIX - CENTERED HEADER)
 # ==========================================
 st.set_page_config(page_title="Mộc Phát Analytics", layout="wide", page_icon="🌲")
 
@@ -54,19 +54,21 @@ st.markdown(f"""
     h1, h2, h3, h4 {{ color: {TEXT_MAIN} !important; font-family: 'Segoe UI', sans-serif; }}
     .stMarkdown p, .stMarkdown li {{ color: {TEXT_SUB} !important; }}
     
-    /* 2. Header Sticky */
+    /* 2. Header Sticky - CĂN GIỮA */
     .header-sticky {{
         position: sticky; top: 15px; z-index: 999;
         background: rgba(18, 18, 18, 0.95);
         backdrop-filter: blur(10px);
         border-bottom: 2px solid {PRIMARY};
-        padding: 15px 25px; 
+        padding: 15px 25px;
         margin: -50px 0px 25px 0px;
         border-radius: 16px;
-        display: flex; align-items: center; justify-content: space-between;
+        display: flex;
+        align-items: center;
+        justify-content: center; /* Căn giữa nội dung */
         box-shadow: 0 4px 20px rgba(0,0,0,0.5);
     }}
-    .app-title {{ font-size: 26px; font-weight: 800; color: {ACCENT}; margin: 0; text-transform: uppercase; letter-spacing: 1px; }}
+    .app-title {{ font-size: 28px; font-weight: 800; color: {ACCENT}; margin: 5px 0 0 0; text-transform: uppercase; letter-spacing: 1.5px; }}
 
     /* 3. KPI Cards Fixed */
     .kpi-card {{
@@ -82,7 +84,7 @@ st.markdown(f"""
     .kpi-lbl {{ font-size: 13px; color: {TEXT_SUB}; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; margin-bottom: 5px; }}
     .kpi-val {{ font-size: 28px; font-weight: 800; color: {TEXT_MAIN}; }}
     
-    /* 4. TABS STYLE FIX (QUAN TRỌNG) */
+    /* 4. TABS STYLE FIX */
     .stTabs [data-baseweb="tab-list"] {{
         gap: 5px;
         background-color: transparent;
@@ -131,20 +133,15 @@ st.markdown(f"""
 </style>
 """, unsafe_allow_html=True)
 
-# Header
+# Header - CẬP NHẬT: CĂN GIỮA & BỎ TEXT PHỤ
 logo_b64 = get_base64_logo("mocphat_logo.png")
-logo_img = f'<img src="data:image/png;base64,{logo_b64}" height="50">' if logo_b64 else "🌲"
+logo_img = f'<img src="data:image/png;base64,{logo_b64}" height="65">' if logo_b64 else "🌲"
 st.markdown(f"""
 <div class="header-sticky">
-    <div style="display:flex; gap:15px; align-items:center;">
+    <div style="text-align: center;">
         {logo_img}
-        <div>
-            <div class="app-title">MỘC PHÁT FURNITURE</div>
-            <div style="font-size:13px; color:{TEXT_SUB};">Hệ thống Phân tích Sản xuất & Kinh doanh</div>
-        </div>
-    </div>
-    <div style="text-align:right;">
-        <span style="font-weight:bold; color:{ACCENT}; font-size:14px; text-shadow: 0 0 10px rgba(102,187,106,0.3);">Dữ liệu 2023-2025</span>
+        <div class="app-title">MỘC PHÁT FURNITURE</div>
+        <div style="font-size:14px; color:{TEXT_SUB}; letter-spacing: 0.5px; margin-top: 5px;">Hệ thống Phân tích Sản xuất & Kinh doanh</div>
     </div>
 </div>
 """, unsafe_allow_html=True)
@@ -212,7 +209,7 @@ if sel_cust: df = df[df['khach_hang'].isin(sel_cust)]
 if df.empty: st.warning("Không có dữ liệu!"); st.stop()
 
 # ==========================================
-# 4. KPI CARDS (FIXED LOGIC)
+# 4. KPI CARDS
 # ==========================================
 st.subheader("🚀 HIỆU QUẢ KINH DOANH")
 
@@ -224,7 +221,7 @@ v25 = vol_by_year.get(2025, 0)
 
 # Tính tăng trưởng
 g24 = ((v24 - v23) / v23 * 100) if v23 > 0 else 0
-g25 = ((v25 - v24) / v24 * 100) if v24 > 0 else 0 # Fix: So sánh 2025 với 2024
+g25 = ((v25 - v24) / v24 * 100) if v24 > 0 else 0
 
 c1, c2, c3, c4 = st.columns(4)
 
@@ -253,7 +250,6 @@ st.markdown("---")
 # ==========================================
 # 5. TABS PHÂN TÍCH
 # ==========================================
-# Cập nhật tên Tabs theo yêu cầu
 tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
     "📊 TỔNG QUAN", "📈 DỰ BÁO TĂNG TRƯỞNG", "📦 SẢN PHẨM", "🎨 MÀU SẮC", "⚖️ KHÁCH HÀNG", "📋 DỮ LIỆU"
 ])
@@ -304,7 +300,7 @@ with tab1:
             </div>
             """, unsafe_allow_html=True)
 
-# --- TAB 2: DỰ BÁO TĂNG TRƯỞNG (Sử dụng Numpy - Ổn định) ---
+# --- TAB 2: DỰ BÁO TĂNG TRƯỞNG ---
 with tab2:
     st.subheader("🎯 Dự báo Tăng trưởng 2026")
     st.caption("Mô hình dự báo dựa trên xu hướng lịch sử và chỉ số mùa vụ.")
