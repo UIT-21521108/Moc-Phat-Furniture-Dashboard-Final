@@ -8,7 +8,7 @@ import os
 from datetime import datetime
 
 # ==========================================
-# 1. CẤU HÌNH GIAO DIỆN (FINAL - GLOW EFFECT)
+# 1. CẤU HÌNH GIAO DIỆN (FULL GLOW EDITION)
 # ==========================================
 st.set_page_config(page_title="Mộc Phát Analytics", layout="wide", page_icon="🌲")
 
@@ -46,7 +46,7 @@ def polish_chart(fig):
     fig.update_yaxes(showgrid=True, gridcolor=GRID_COLOR, zerolinecolor=GRID_COLOR)
     return fig
 
-# --- CSS CAO CẤP (GIAO DIỆN + HIỆU ỨNG GLOW) ---
+# --- CSS CAO CẤP (FULL GLOW EFFECT) ---
 st.markdown(f"""
 <style>
     /* 1. Nền & Chữ */
@@ -54,7 +54,7 @@ st.markdown(f"""
     h1, h2, h3, h4 {{ color: {TEXT_MAIN} !important; font-family: 'Segoe UI', sans-serif; }}
     .stMarkdown p, .stMarkdown li {{ color: {TEXT_SUB} !important; }}
     
-    /* 2. Header Sticky - CĂN GIỮA */
+    /* 2. Header Sticky */
     .header-sticky {{
         position: sticky; top: 15px; z-index: 999;
         background: rgba(18, 18, 18, 0.95);
@@ -63,14 +63,16 @@ st.markdown(f"""
         padding: 15px 25px;
         margin: -50px 0px 25px 0px;
         border-radius: 16px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
+        display: flex; align-items: center; justify-content: center;
         box-shadow: 0 4px 20px rgba(0,0,0,0.5);
     }}
     .app-title {{ font-size: 28px; font-weight: 800; color: {ACCENT}; margin: 5px 0 0 0; text-transform: uppercase; letter-spacing: 1.5px; }}
 
-    /* 3. KPI Cards */
+    /* =============================================
+       3. HIỆU ỨNG GLOW CHO TẤT CẢ CÁC THẺ (CARD)
+       ============================================= */
+    
+    /* A. KPI CARDS */
     .kpi-card {{
         background: {CARD_BG}; 
         border-radius: 12px;
@@ -78,21 +80,27 @@ st.markdown(f"""
         border: 1px solid rgba(255,255,255,0.08);
         border-left: 4px solid {PRIMARY};
         box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-        transition: transform 0.2s;
+        transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
     }}
-    .kpi-card:hover {{ transform: translateY(-3px); border-left-color: {NEON_GREEN}; }}
+    .kpi-card:hover {{ 
+        transform: translateY(-5px); 
+        border-left-color: {NEON_GREEN};
+        border-top: 1px solid rgba(0, 230, 118, 0.5);
+        border-right: 1px solid rgba(0, 230, 118, 0.5);
+        border-bottom: 1px solid rgba(0, 230, 118, 0.5);
+        box-shadow: 0 0 20px rgba(0, 230, 118, 0.4); /* Glow xanh */
+    }}
     .kpi-lbl {{ font-size: 13px; color: {TEXT_SUB}; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; margin-bottom: 5px; }}
-    .kpi-val {{ font-size: 28px; font-weight: 800; color: {TEXT_MAIN}; }}
-    
-    /* 4. CUSTOM TABS STYLE (CÓ HIỆU ỨNG GLOW) */
+    .kpi-val {{ font-size: 28px; font-weight: 800; color: {TEXT_MAIN}; transition: color 0.3s; }}
+    .kpi-card:hover .kpi-val {{ color: {NEON_GREEN}; }}
+
+    /* B. TABS (NAVIGATION) */
     .stTabs [data-baseweb="tab-list"] {{
         gap: 8px;
         background-color: transparent;
         padding: 10px 0;
         border-bottom: 1px solid rgba(255,255,255,0.1);
     }}
-    
-    /* Trạng thái thường */
     .stTabs [data-baseweb="tab"] {{
         height: 40px;
         background-color: {CARD_BG};
@@ -102,37 +110,42 @@ st.markdown(f"""
         padding: 0 20px;
         font-weight: 600;
         font-size: 14px;
-        transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+        transition: all 0.3s ease;
     }}
-    
-    /* HIỆU ỨNG GLOW KHI DI CHUỘT (HOVER) */
+    /* Hover Tab */
     .stTabs [data-baseweb="tab"]:hover {{
         border-color: {NEON_GREEN} !important;
         color: {NEON_GREEN} !important;
         background-color: rgba(0, 230, 118, 0.1) !important;
-        box-shadow: 0 0 15px rgba(0, 230, 118, 0.6); /* Ánh xanh phát sáng */
-        transform: translateY(-2px); /* Nhấc nhẹ lên */
-        z-index: 10;
+        box-shadow: 0 0 15px rgba(0, 230, 118, 0.6);
+        transform: translateY(-2px);
     }}
-    
-    /* Trạng thái đang chọn (Active) */
+    /* Active Tab */
     .stTabs [aria-selected="true"] {{
         background-color: {PRIMARY} !important;
         color: #FFFFFF !important;
         border: 1px solid {NEON_GREEN} !important;
-        box-shadow: 0 0 10px rgba(0, 230, 118, 0.3);
+        box-shadow: 0 0 15px rgba(0, 230, 118, 0.4);
     }}
 
-    /* 5. Insight & Forecast Box */
-    .insight-box {{
-        background: rgba(6, 104, 57, 0.15); 
-        border: 1px solid {PRIMARY};
+    /* C. INSIGHT & FORECAST BOX */
+    .insight-box, .forecast-box {{
         padding: 15px; border-radius: 10px; margin-bottom: 20px;
+        transition: all 0.3s ease;
+        border: 1px solid transparent;
     }}
-    .forecast-box {{
-        background: rgba(255, 167, 38, 0.08);
-        border: 1px solid #FFA726;
-        padding: 15px; border-radius: 10px; margin-bottom: 20px;
+    
+    .insight-box {{ background: rgba(6, 104, 57, 0.15); border: 1px solid {PRIMARY}; }}
+    .insight-box:hover {{
+        box-shadow: 0 0 20px rgba(0, 230, 118, 0.3);
+        border-color: {NEON_GREEN};
+        transform: scale(1.01);
+    }}
+
+    .forecast-box {{ background: rgba(255, 167, 38, 0.08); border: 1px solid #FFA726; }}
+    .forecast-box:hover {{
+        box-shadow: 0 0 20px rgba(255, 167, 38, 0.3);
+        transform: scale(1.01);
     }}
 
     /* 6. DataFrame */
@@ -144,7 +157,7 @@ st.markdown(f"""
 </style>
 """, unsafe_allow_html=True)
 
-# Header - CĂN GIỮA
+# Header
 logo_b64 = get_base64_logo("mocphat_logo.png")
 logo_img = f'<img src="data:image/png;base64,{logo_b64}" height="65">' if logo_b64 else "🌲"
 st.markdown(f"""
